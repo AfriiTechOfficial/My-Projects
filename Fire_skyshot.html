@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grand Skyshot Fireworks</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000000;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="fireworksCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('fireworksCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        const PALETTES = [
+            { primary: '#ff3b9a', secondary: '#a855f7', core: '#ffffff' }, // Magenta & Violet
+            { primary: '#38bdf8', secondary: '#6366f1', core: '#e0f2fe' }, // Electric Cyan & Indigo
+            { primary: '#fbbf24', secondary: '#f97316', core: '#fef3c7' }, // Royal Gold & Amber
+            { primary: '#34d399', secondary: '#10b981', core: '#d1fae5' }, // Emerald & Mint
+            { primary: '#f43f5e', secondary: '#fb7185', core: '#ffe4e6' }, // Crimson & Rose
+            { primary: '#c084fc', secondary: '#38bdf8', core: '#ffffff' }, // Purple & Sky Blue
+            { primary: '#fde047', secondary: '#ec4899', core: '#ffffff' }  // Gold & Hot Pink
+        ];
+
+        const shells = [];
+        const sparks = [];
+        const flashes = [];
+
+        function random(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        class Flash {
+            constructor(x, y, radius, color) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.color = color;
+                this.alpha = 0.35;
+            }
+
+            update() {
+                this.alpha *= 0.86;
+                return this.alpha > 0.01;
+            }
+
+            draw() {
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+                gradient.addColorStop(0, this.color);
+                gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Spark {
+            constructor(x, y, angle, speed, color, size, decay, glitter = false) {
+                this.x = x;
+                this.y = y;
+                this.prevX = x;
+                this.prevY = y;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.color = color;
+                this.size = size;
+                this.alpha = 1;
+                this.decay = decay;
+                this.drag = 0.945;
+                this.gravity = 0.055;
+                this.glitter = glitter;
+                this.strobePhase = random(0, Math.PI * 2);
+            }
+
+            update() {
+                this.prevX = this.x;
+                this.prevY = this.y;
+
+                this.vx *= this.drag;
+                this.vy *= this.drag;
+                this.vy += this.gravity;
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.alpha -= this.decay;
+                this.strobePhase += 0.45;
+
+                return this.alpha > 0;
+            }
+
+            draw() {
+                let drawAlpha = this.alpha;
+                if (this.glitter && this.alpha < 0.65) {
+                    drawAlpha *= (Math.sin(this.strobePhase) > 0 ? 1 : 0.2);
+                }
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, drawAlpha);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = this.size;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(this.prevX, this.prevY);
+                ctx.lineTo(this.x, this.y);
+                ctx.stroke();
+
+                // Bright glowing tip
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.55, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Shell {
+            constructor(startX, targetX, targetY, scale = 1, palette = null, style = 'chrysanthemum') {
+                this.x = startX;
+                this.y = height;
+                this.prevX = this.x;
+                this.prevY = this.y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.scale = scale;
+                this.palette = palette || PALETTES[Math.floor(Math.random() * PALETTES.length)];
+                this.style = style;
+
+                const dx = targetX - startX;
+                const dy = targetY - height;
+                const flightFrames = random(46, 58);
+
+                this.vx = dx / flightFrames;
+                this.gravity = 0.14;
+                // Calculate initial upward velocity to reach apex near targetY
+                this.vy = (dy - 0.5 * this.gravity * flightFrames * flightFrames) / flightFrames;
+                this.trail = [];
+            }
+
+            update() {
+                this.prevX = this.x;
+                this.prevY = this.y;
+
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > 10) {
+                    this.trail.shift();
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += this.gravity;
+
+                // Detonate at peak of trajectory
+                if (this.vy >= -0.6) {
+                    this.burst();
+                    return false;
+                }
+                return true;
+            }
+
+            draw() {
+                ctx.save();
+                for (let i = 1; i < this.trail.length; i++) {
+                    const ratio = i / this.trail.length;
+                    ctx.globalAlpha = ratio * 0.7;
+                    ctx.strokeStyle = this.palette.core;
+                    ctx.lineWidth = ratio * 2.4;
+                    ctx.beginPath();
+                    ctx.moveTo(this.trail[i - 1].x, this.trail[i - 1].y);
+                    ctx.lineTo(this.trail[i].x, this.trail[i].y);
+                    ctx.stroke();
+                }
+
+                // Glowing rocket head
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            burst() {
+                const baseRadius = Math.min(width, height) * 0.42 * this.scale;
+                const maxSpeed = baseRadius * 0.058;
+
+                flashes.push(new Flash(this.x, this.y, baseRadius * 0.9, this.palette.primary));
+
+                if (this.style === 'ring') {
+                    // Outer giant ring + inner bright core ring
+                    const outerCount = 120;
+                    for (let i = 0; i < outerCount; i++) {
+                        const angle = (Math.PI * 2 * i) / outerCount + random(-0.015, 0.015);
+                        const speed = maxSpeed * random(0.95, 1.03);
+                        sparks.push(new Spark(this.x, this.y, angle, speed, this.palette.primary, 2.3, random(0.011, 0.016), true));
+                    }
+                    const innerCount = 60;
+                    for (let i = 0; i < innerCount; i++) {
+                        const angle = (Math.PI * 2 * i) / innerCount;
+                        const speed = maxSpeed * 0.52 * random(0.95, 1.05);
+                        sparks.push(new Spark(this.x, this.y, angle, speed, this.palette.core, 2.0, random(0.014, 0.020), false));
+                    }
+                } else {
+                    // Dense spherical chrysanthemum burst covering a wide sky area
+                    const totalSparks = Math.floor(210 * this.scale);
+                    for (let i = 0; i < totalSparks; i++) {
+                        const angle = random(0, Math.PI * 2);
+                        // Distribute particles evenly across the full sphere area
+                        const radiusFactor = Math.pow(Math.random(), 0.42);
+                        const speed = maxSpeed * radiusFactor;
+
+                        let color = this.palette.primary;
+                        if (radiusFactor < 0.35) {
+                            color = this.palette.core;
+                        } else if (radiusFactor < 0.72) {
+                            color = this.palette.secondary;
+                        }
+
+                        const size = radiusFactor > 0.75 ? random(2.0, 2.8) : random(1.5, 2.2);
+                        const decay = random(0.010, 0.017);
+                        sparks.push(new Spark(this.x, this.y, angle, speed, color, size, decay, true));
+                    }
+                }
+            }
+        }
+
+        function launchSingle(customX = null, customY = null) {
+            const startX = customX !== null ? customX + random(-40, 40) : random(width * 0.15, width * 0.85);
+            const targetX = customX !== null ? customX : startX + random(-60, 60);
+            const targetY = customY !== null ? customY : random(height * 0.18, height * 0.46);
+            const scale = random(1.05, 1.35);
+            const style = Math.random() < 0.25 ? 'ring' : 'chrysanthemum';
+            shells.push(new Shell(startX, targetX, targetY, scale, null, style));
+        }
+
+        function launchGrandWave() {
+            // Launches 6 to 8 giant rockets simultaneously across the screen width like in the video
+            const count = width < 600 ? 5 : 7;
+            const margin = width * 0.12;
+            const step = (width - margin * 2) / (count - 1);
+
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    const x = margin + step * i + random(-15, 15);
+                    const y = random(height * 0.20, height * 0.42);
+                    const palette = PALETTES[(i + Math.floor(Math.random() * PALETTES.length)) % PALETTES.length];
+                    shells.push(new Shell(x, x + random(-25, 25), y, random(1.0, 1.25), palette, 'chrysanthemum'));
+                }, i * 70);
+            }
+        }
+
+        // Click or tap anywhere to launch a huge skyshot to that exact spot
+        window.addEventListener('pointerdown', (e) => {
+            launchSingle(e.clientX, e.clientY);
+        });
+
+        let sequenceStep = 0;
+        let nextLaunchTime = 0;
+
+        function animate(timestamp) {
+            requestAnimationFrame(animate);
+
+            // Fade frame smoothly to preserve long glowing spark trails
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.17)';
+            ctx.fillRect(0, 0, width, height);
+
+            // Additive blending makes overlapping fireworks glow intensely
+            ctx.globalCompositeOperation = 'lighter';
+
+            for (let i = flashes.length - 1; i >= 0; i--) {
+                if (!flashes[i].update()) {
+                    flashes.splice(i, 1);
+                } else {
+                    flashes[i].draw();
+                }
+            }
+
+            for (let i = shells.length - 1; i >= 0; i--) {
+                if (!shells[i].update()) {
+                    shells.splice(i, 1);
+                } else {
+                    shells[i].draw();
+                }
+            }
+
+            for (let i = sparks.length - 1; i >= 0; i--) {
+                if (!sparks[i].update()) {
+                    sparks.splice(i, 1);
+                } else {
+                    sparks[i].draw();
+                }
+            }
+
+            // Choreographed show sequence matching the video
+            if (timestamp >= nextLaunchTime) {
+                if (sequenceStep % 4 === 2) {
+                    launchGrandWave();
+                    nextLaunchTime = timestamp + 2900;
+                } else if (sequenceStep % 4 === 3) {
+                    launchSingle();
+                    setTimeout(() => launchSingle(), 250);
+                    nextLaunchTime = timestamp + 2100;
+                } else {
+                    launchSingle();
+                    nextLaunchTime = timestamp + 1700;
+                }
+                sequenceStep++;
+            }
+        }
+
+        requestAnimationFrame(animate);
+    </script>
+</body>
+</html>
