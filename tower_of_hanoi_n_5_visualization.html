@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TOWER OF HANOI .N=5</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: #000000;
+      color: #ffffff;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .font-mono-code {
+      font-family: 'Fira Code', monospace;
+    }
+
+    /* Title styling matching video aesthetics */
+    .hanoi-title {
+      font-family: 'Fira Code', monospace;
+      font-weight: 400;
+      letter-spacing: 0.14em;
+      color: #d4d4d8;
+    }
+
+    /* Disk transitions and visual polish */
+    .hanoi-disk {
+      position: absolute;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      transition: background-color 0.22s ease, box-shadow 0.22s ease;
+      will-change: transform, left, top;
+      z-index: 10;
+    }
+
+    .disk-idle {
+      background-color: #374151;
+      border: 1px solid #4b5563;
+    }
+
+    .disk-moving {
+      background-color: #1d9bf0;
+      border: 1px solid #60a5fa;
+      box-shadow: 0 6px 18px rgba(29, 155, 240, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+      z-index: 25;
+    }
+
+    .disk-solved {
+      background-color: #22c55e;
+      border: 1px solid #4ade80;
+      box-shadow: 0 3px 12px rgba(34, 197, 94, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    }
+
+    /* Final completion box around Peg C tower */
+    .completion-box {
+      position: absolute;
+      border: 1.5px solid #4b5563;
+      border-radius: 10px;
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.97);
+      transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 5;
+      box-shadow: 0 0 24px rgba(34, 197, 94, 0.12);
+    }
+
+    .completion-box.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    /* Code line highlight bar matching the video */
+    .code-line {
+      position: relative;
+      display: flex;
+      align-items: center;
+      padding: 3px 12px;
+      border-left: 3px solid transparent;
+      transition: background-color 0.14s ease, border-color 0.14s ease;
+      white-space: pre;
+    }
+
+    .code-line.active {
+      background-color: rgba(34, 197, 94, 0.18);
+      border-left-color: #22c55e;
+    }
+
+    /* Syntax highlighting tokens */
+    .tok-keyword { color: #c084fc; }
+    .tok-type { color: #60a5fa; }
+    .tok-fn { color: #38bdf8; }
+    .tok-num { color: #fb923c; }
+    .tok-param { color: #e2e8f0; }
+    .tok-punct { color: #94a3b8; }
+
+    /* Custom subtle range/button styling */
+    .ctrl-btn {
+      background-color: #111317;
+      border: 1px solid #1f2937;
+      color: #d1d5db;
+      transition: all 0.16s ease;
+    }
+    .ctrl-btn:hover {
+      background-color: #1f2937;
+      color: #ffffff;
+      border-color: #374151;
+    }
+    .ctrl-btn:active {
+      transform: scale(0.96);
+    }
+  </style>
+</head>
+<body class="bg-black text-white min-h-screen flex flex-col items-center justify-between py-6 px-4 sm:py-10">
+
+  <!-- Main Centered Container -->
+  <main class="w-full max-w-xl flex flex-col items-center my-auto">
+
+    <!-- Header Title -->
+    <header class="text-center mb-5 sm:mb-7">
+      <h1 id="mainTitle" class="hanoi-title text-2xl sm:text-3xl md:text-4xl tracking-widest uppercase">
+        TOWER OF HANOI .N=5
+      </h1>
+    </header>
+
+    <!-- Move Counter -->
+    <div class="mb-6 sm:mb-8 text-center">
+      <p id="moveCounter" class="text-base sm:text-lg font-semibold tracking-wide text-white">
+        Move 0 / 31
+      </p>
+    </div>
+
+    <!-- Simulation Stage (Pegs + Disks) -->
+    <section class="w-full flex flex-col items-center mb-6 sm:mb-8">
+      <div id="stageContainer" class="relative w-full max-w-[520px] h-[240px] sm:h-[265px]">
+        <!-- Completion Highlight Box around Peg C -->
+        <div id="completionBox" class="completion-box"></div>
+
+        <!-- Peg Rods (A, B, C) -->
+        <div id="rodA" class="absolute w-[6px] bg-[#4b5563] rounded-t-full -translate-x-1/2" style="left: 18%; bottom: 34px; height: 155px;"></div>
+        <div id="rodB" class="absolute w-[6px] bg-[#4b5563] rounded-t-full -translate-x-1/2" style="left: 50%; bottom: 34px; height: 155px;"></div>
+        <div id="rodC" class="absolute w-[6px] bg-[#4b5563] rounded-t-full -translate-x-1/2" style="left: 82%; bottom: 34px; height: 155px;"></div>
+
+        <!-- Horizontal Base Bar -->
+        <div id="baseBar" class="absolute left-[4%] right-[4%] h-[8px] bg-[#4b5563] rounded-full" style="bottom: 28px;"></div>
+
+        <!-- Peg Labels -->
+        <div class="absolute -translate-x-1/2 text-xs sm:text-sm font-bold text-gray-200" style="left: 18%; bottom: 4px;">A</div>
+        <div class="absolute -translate-x-1/2 text-xs sm:text-sm font-bold text-gray-200" style="left: 50%; bottom: 4px;">B</div>
+        <div class="absolute -translate-x-1/2 text-xs sm:text-sm font-bold text-gray-200" style="left: 82%; bottom: 4px;">C</div>
+
+        <!-- Dynamic Disks Layer -->
+        <div id="disksLayer" class="absolute inset-0 pointer-events-none"></div>
+      </div>
+    </section>
+
+    <!-- Status Text -->
+    <div class="w-full max-w-[520px] text-center mb-3">
+      <p id="statusText" class="font-mono-code text-xs sm:text-sm text-[#9ca3af] tracking-wide">
+        Solving Tower of Hanoi for N=5..
+      </p>
+    </div>
+
+    <!-- C++ Recursive Code Editor Panel -->
+    <section class="w-full max-w-[520px] bg-[#111317] border border-[#1f2937] rounded-xl overflow-hidden shadow-2xl mb-6">
+      <div class="py-2.5 sm:py-3 font-mono-code text-[12px] sm:text-[14px] leading-relaxed overflow-x-auto">
+        <div id="codeLine1" class="code-line">
+          <span class="w-6 text-right pr-3 text-gray-600 select-none">1</span><span><span class="tok-type">void</span> <span class="tok-fn">solve</span><span class="tok-punct">(</span><span class="tok-type">int</span> <span class="tok-param">n</span><span class="tok-punct">,</span> <span class="tok-type">char</span> <span class="tok-param">from</span><span class="tok-punct">,</span> <span class="tok-type">char</span> <span class="tok-param">to</span><span class="tok-punct">,</span> <span class="tok-type">char</span> <span class="tok-param">via</span><span class="tok-punct">) {</span></span>
+        </div>
+        <div id="codeLine2" class="code-line">
+          <span class="w-6 text-right pr-3 text-gray-600 select-none">2</span><span>  <span class="tok-keyword">if</span> <span class="tok-punct">(</span><span class="tok-param">n</span> <span class="tok-punct">==</span> <span class="tok-num">0</span><span class="tok-punct">)</span> <span class="tok-keyword">return</span><span class="tok-punct">;</span></span>
+        </div>
+        <div id="codeLine3" class="code-line">
+          <span class="w-6 text-right pr-3 text-gray-600 select-none">3</span><span>  <span class="tok-fn">solve</span><span class="tok-punct">(</span><span class="tok-param">n</span> <span class="tok-punct">-</span> <span class="tok-num">1</span><span class="tok-punct">,</span> <span class="tok-param">from</span><span class="tok-punct">,</span> <span class="tok-param">via</span><span class="tok-punct">,</span> <span class="tok-param">to</span><span class="tok-punct">);</span></span>
+        </div>
+        <div id="codeLine4" class="code-line">
+          <span class="w-6 text-right pr-3 text-gray-600 select-none">4</span><span>  <span class="tok-fn">move</span><span class="tok-punct">(</span><span class="tok-param">from</span><span class="tok-punct">,</span> <span class="tok-param">to</span><span class="tok-punct">);</span></span>
+        </div>
+        <div id="codeLine5" class="code-line">
+          <span class="w-6 text-right pr-3 text-gray-600 select-none">5</span><span>  <span class="tok-fn">solve</span><span class="tok-punct">(</span><span class="tok-param">n</span> <span class="tok-punct">-</span> <span class="tok-num">1</span><span class="tok-punct">,</span> <span class="tok-param">via</span><span class="tok-punct">,</span> <span class="tok-param">to</span><span class="tok-punct">,</span> <span class="tok-param">from</span><span class="tok-punct">);</span></span>
+        </div>
+        <div id="codeLine6" class="code-line">
+          <span class="w-6 text-right pr-3 text-gray-600 select-none">6</span><span><span class="tok-punct">}</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sleek Dark Interactive Control Bar -->
+    <footer class="w-full max-w-[520px] flex flex-wrap items-center justify-between gap-2 pt-1">
+      <!-- Playback Controls -->
+      <div class="flex items-center gap-1.5">
+        <button id="btnPlayPause" class="ctrl-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium flex items-center gap-1.5 cursor-pointer" title="Play / Pause">
+          <span id="playPauseIcon">❚❚</span>
+          <span id="playPauseLabel">Pause</span>
+        </button>
+
+        <button id="btnRestart" class="ctrl-btn px-3 py-2 rounded-lg text-xs sm:text-sm font-medium cursor-pointer" title="Restart Simulation">
+          ↺ Restart
+        </button>
+
+        <button id="btnStepBack" class="ctrl-btn px-2.5 py-2 rounded-lg text-xs sm:text-sm font-medium cursor-pointer" title="Previous Move">
+          ◀
+        </button>
+
+        <button id="btnStepForward" class="ctrl-btn px-2.5 py-2 rounded-lg text-xs sm:text-sm font-medium cursor-pointer" title="Next Move">
+          ▶
+        </button>
+      </div>
+
+      <!-- Speed, N Selector & Sound Toggle -->
+      <div class="flex items-center gap-1.5">
+        <button id="btnSpeed" class="ctrl-btn px-2.5 py-2 rounded-lg text-xs font-mono-code font-medium cursor-pointer" title="Animation Speed">
+          1x
+        </button>
+
+        <select id="diskCountSelect" aria-label="Number of Disks" class="ctrl-btn px-2.5 py-2 rounded-lg text-xs font-mono-code font-medium cursor-pointer outline-none">
+          <option value="3">N=3</option>
+          <option value="4">N=4</option>
+          <option value="5" selected>N=5</option>
+          <option value="6">N=6</option>
+        </select>
+
+        <button id="btnSound" class="ctrl-btn px-2.5 py-2 rounded-lg text-xs font-medium cursor-pointer" title="Toggle Sound Effects">
+          🔊
+        </button>
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    /**
+     * Tower of Hanoi Exact Interactive Visualization
+     * Faithfully replicates the visual hierarchy, disk color state transitions,
+     * smooth 3-phase arc trajectory (lift -> glide -> drop), and recursive line highlighting.
+     */
+    (function () {
+      // --- State & Configuration ---
+      let numDisks = 5;
+      let totalMoves = Math.pow(2, numDisks) - 1;
+      let movesList = []; // Sequence of { disk, from, to, callType, preLine }
+      let currentMoveIndex = 0; // 0 means initial state before move 1
+      let isPlaying = true;
+      let speedMultiplier = 1;
+      let soundEnabled = true;
+
+      // Peg stacks: arrays of disk IDs from bottom to top (e.g., [5, 4, 3, 2, 1])
+      let pegs = { A: [], B: [], C: [] };
+      // Tracks which disks have permanently settled into their final position on Peg C
+      let solvedDisks = new Set();
+
+      // Animation runtime state
+      let animState = null; // { disk, from, to, moveNum, startTime, duration, phase }
+      let rafId = null;
+      let pauseTimeoutId = null;
+      let audioCtx = null;
+
+      // DOM Elements
+      const mainTitle = document.getElementById('mainTitle');
+      const moveCounter = document.getElementById('moveCounter');
+      const statusText = document.getElementById('statusText');
+      const stageContainer = document.getElementById('stageContainer');
+      const disksLayer = document.getElementById('disksLayer');
+      const completionBox = document.getElementById('completionBox');
+      const btnPlayPause = document.getElementById('btnPlayPause');
+      const playPauseIcon = document.getElementById('playPauseIcon');
+      const playPauseLabel = document.getElementById('playPauseLabel');
+      const btnRestart = document.getElementById('btnRestart');
+      const btnStepBack = document.getElementById('btnStepBack');
+      const btnStepForward = document.getElementById('btnStepForward');
+      const btnSpeed = document.getElementById('btnSpeed');
+      const diskCountSelect = document.getElementById('diskCountSelect');
+      const btnSound = document.getElementById('btnSound');
+
+      const codeLines = {
+        1: document.getElementById('codeLine1'),
+        2: document.getElementById('codeLine2'),
+        3: document.getElementById('codeLine3'),
+        4: document.getElementById('codeLine4'),
+        5: document.getElementById('codeLine5'),
+        6: document.getElementById('codeLine6'),
+      };
+
+      const diskElements = {};
+
+      // --- Web Audio API Synthesizer for Subtle Pop & Victory Chime ---
+      function initAudio() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            audioCtx = new AudioContextClass();
+          }
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+      }
+
+      function playPopSound(diskId) {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          if (!audioCtx) return;
+          const now = audioCtx.currentTime;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          // Higher pitch for smaller disks, lower for larger disks
+          const baseFreq = 320 + (numDisks - diskId) * 55;
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(baseFreq, now);
+          osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.45, now + 0.055);
+
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.07);
+        } catch (e) {
+          // Ignore audio autoplay blocks until first user interaction
+        }
+      }
+
+      function playVictoryChime() {
+        if (!soundEnabled) return;
+        try {
+          initAudio();
+          if (!audioCtx) return;
+          const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+          notes.forEach((freq, idx) => {
+            const now = audioCtx.currentTime + idx * 0.085;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now);
+
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.11, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.45);
+          });
+        } catch (e) {}
+      }
+
+      // --- Recursive Move Generator ---
+      function generateMoves(n) {
+        const list = [];
+        function solve(k, from, to, via, branchLine) {
+          if (k === 0) return;
+          // Left recursion: solve(n - 1, from, via, to) -> line 3
+          solve(k - 1, from, via, to, 3);
+          // Disk movement: move(from, to) -> line 4 (with pre-branch context)
+          list.push({
+            disk: k,
+            from,
+            to,
+            branchLine,
+          });
+          // Right recursion: solve(n - 1, via, to, from) -> line 5
+          solve(k - 1, via, to, from, 5);
+        }
+        solve(n, 'A', 'C', 'B', 3);
+        return list;
+      }
+
+      // --- Geometry & Responsive Stage Metrics ---
+      function getStageMetrics() {
+        const stageWidth = stageContainer.clientWidth || 500;
+        const stageHeight = stageContainer.clientHeight || 250;
+
+        const pegX = {
+          A: stageWidth * 0.18,
+          B: stageWidth * 0.50,
+          C: stageWidth * 0.82,
+        };
+
+        const baseBottom = 36; // top surface of base bar from bottom
+        const diskHeight = numDisks <= 5 ? 23 : 20;
+        const diskGap = 2;
+        const liftY = 24; // Y position from top when floating above pegs
+
+        // Width scales proportionally from smallest disk (1) to largest disk (numDisks)
+        const maxDiskWidth = Math.min(stageWidth * 0.27, 134);
+        const minDiskWidth = Math.max(stageWidth * 0.085, 38);
+
+        function getDiskWidth(diskId) {
+          if (numDisks === 1) return maxDiskWidth;
+          const ratio = (diskId - 1) / (numDisks - 1);
+          return minDiskWidth + ratio * (maxDiskWidth - minDiskWidth);
+        }
+
+        function getStackTopY(stackIndex) {
+          // stackIndex 0 is bottom-most disk on base bar
+          return stageHeight - baseBottom - (stackIndex + 1) * diskHeight - stackIndex * diskGap;
+        }
+
+        return {
+          stageWidth,
+          stageHeight,
+          pegX,
+          baseBottom,
+          diskHeight,
+          diskGap,
+          liftY,
+          getDiskWidth,
+          getStackTopY,
+        };
+      }
+
+      // --- Code Line Highlighting ---
+      function highlightLine(lineNum) {
+        Object.keys(codeLines).forEach((key) => {
+          if (Number(key) === lineNum) {
+            codeLines[key].classList.add('active');
+          } else {
+            codeLines[key].classList.remove('active');
+          }
+        });
+      }
+
+      // --- Solved Disks Calculation ---
+      // A disk is permanently solved (emerald green) once it reaches Peg C AND all larger disks
+      // beneath it are already permanently solved on Peg C.
+      function recomputeSolvedDisks() {
+        solvedDisks.clear();
+        const pegC = pegs.C;
+        let expectedDisk = numDisks;
+        for (let i = 0; i < pegC.length; i++) {
+          if (pegC[i] === expectedDisk) {
+            solvedDisks.add(expectedDisk);
+            expectedDisk--;
+          } else {
+            break;
+          }
+        }
+      }
+
+      // --- Build / Reset Disk Elements ---
+      function createDiskElements() {
+        disksLayer.innerHTML = '';
+        Object.keys(diskElements).forEach((k) => delete diskElements[k]);
+
+        for (let d = 1; d <= numDisks; d++) {
+          const el = document.createElement('div');
+          el.className = 'hanoi-disk disk-idle text-xs sm:text-sm';
+          el.textContent = String(d);
+          disksLayer.appendChild(el);
+          diskElements[d] = el;
+        }
+      }
+
+      // --- Render Static Board State ---
+      function renderBoard(activeMovingDisk = null, customPos = null) {
+        const metrics = getStageMetrics();
+
+        // Position every disk currently resting on pegs
+        ['A', 'B', 'C'].forEach((pegKey) => {
+          const stack = pegs[pegKey];
+          stack.forEach((diskId, idx) => {
+            if (diskId === activeMovingDisk) return;
+            const el = diskElements[diskId];
+            if (!el) return;
+
+            const w = metrics.getDiskWidth(diskId);
+            const left = metrics.pegX[pegKey] - w / 2;
+            const top = metrics.getStackTopY(idx);
+
+            el.style.width = `${w}px`;
+            el.style.height = `${metrics.diskHeight}px`;
+            el.style.left = `${left}px`;
+            el.style.top = `${top}px`;
+
+            el.classList.remove('disk-moving', 'disk-idle', 'disk-solved');
+            if (solvedDisks.has(diskId)) {
+              el.classList.add('disk-solved');
+            } else {
+              el.classList.add('disk-idle');
+            }
+          });
+        });
+
+        // Position active moving disk if mid-flight
+        if (activeMovingDisk !== null && customPos) {
+          const el = diskElements[activeMovingDisk];
+          if (el) {
+            const w = metrics.getDiskWidth(activeMovingDisk);
+            el.style.width = `${w}px`;
+            el.style.height = `${metrics.diskHeight}px`;
+            el.style.left = `${customPos.x - w / 2}px`;
+            el.style.top = `${customPos.y}px`;
+
+            el.classList.remove('disk-idle', 'disk-solved');
+            el.classList.add('disk-moving');
+          }
+        }
+
+        // Update completion outline box around Peg C
+        if (currentMoveIndex === totalMoves && !animState) {
+          const maxW = metrics.getDiskWidth(numDisks);
+          const topDiskY = metrics.getStackTopY(numDisks - 1);
+          const bottomDiskY = metrics.getStackTopY(0) + metrics.diskHeight;
+          const padX = 12;
+          const padTop = 10;
+          const padBottom = 6;
+
+          completionBox.style.width = `${maxW + padX * 2}px`;
+          completionBox.style.height = `${bottomDiskY - topDiskY + padTop + padBottom}px`;
+          completionBox.style.left = `${metrics.pegX.C - (maxW + padX * 2) / 2}px`;
+          completionBox.style.top = `${topDiskY - padTop}px`;
+          completionBox.classList.add('visible');
+        } else {
+          completionBox.classList.remove('visible');
+        }
+      }
+
+      // --- Easing Helper ---
+      function easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+
+      // --- Start Animating Next Move ---
+      function startNextMove() {
+        if (!isPlaying) return;
+        if (currentMoveIndex >= totalMoves) {
+          isPlaying = false;
+          updatePlayPauseUI();
+          highlightLine(6);
+          renderBoard();
+          return;
+        }
+
+        const nextMove = movesList[currentMoveIndex];
+        const moveNumber = currentMoveIndex + 1;
+
+        // Update Move Counter immediately when move begins (just like the video: "Move 1 / 31")
+        moveCounter.textContent = `Move ${moveNumber} / ${totalMoves}`;
+
+        // Briefly highlight recursive call line (line 3 or line 5) before executing move(from, to) on line 4
+        highlightLine(nextMove.branchLine);
+
+        // Base move duration ~560ms at 1x so 31 moves complete in ~19-20 seconds like the reference video
+        const baseDuration = numDisks === 5 ? 560 : numDisks < 5 ? 640 : 420;
+        const duration = baseDuration / speedMultiplier;
+
+        const metrics = getStageMetrics();
+        const startStackIdx = pegs[nextMove.from].length - 1;
+        const targetStackIdx = pegs[nextMove.to].length;
+
+        animState = {
+          disk: nextMove.disk,
+          from: nextMove.from,
+          to: nextMove.to,
+          moveNumber,
+          startTime: performance.now(),
+          duration,
+          startX: metrics.pegX[nextMove.from],
+          startY: metrics.getStackTopY(startStackIdx),
+          targetX: metrics.pegX[nextMove.to],
+          targetY: metrics.getStackTopY(targetStackIdx),
+          liftY: metrics.liftY,
+          switchedToLine4: false,
+        };
+
+        rafId = requestAnimationFrame(animateFrame);
+      }
+
+      function animateFrame(now) {
+        if (!animState) return;
+
+        const elapsed = now - animState.startTime;
+        const rawProgress = Math.min(elapsed / animState.duration, 1);
+
+        // Switch code highlight to line 4 `move(from, to);` once disk lifts off
+        if (!animState.switchedToLine4 && rawProgress >= 0.14) {
+          animState.switchedToLine4 = true;
+          highlightLine(4);
+        }
+
+        // 3-phase smooth trajectory:
+        // 0.00 -> 0.28: Lift vertically up above source peg
+        // 0.28 -> 0.72: Glide horizontally across to target peg
+        // 0.72 -> 1.00: Drop vertically onto target stack
+        let x = animState.startX;
+        let y = animState.startY;
+
+        if (rawProgress < 0.28) {
+          const p = easeInOutCubic(rawProgress / 0.28);
+          x = animState.startX;
+          y = animState.startY + (animState.liftY - animState.startY) * p;
+        } else if (rawProgress < 0.72) {
+          const p = easeInOutCubic((rawProgress - 0.28) / 0.44);
+          x = animState.startX + (animState.targetX - animState.startX) * p;
+          y = animState.liftY;
+        } else {
+          const p = easeInOutCubic((rawProgress - 0.72) / 0.28);
+          x = animState.targetX;
+          y = animState.liftY + (animState.targetY - animState.liftY) * p;
+        }
+
+        renderBoard(animState.disk, { x, y });
+
+        if (rawProgress < 1) {
+          rafId = requestAnimationFrame(animateFrame);
+        } else {
+          // Complete move
+          const finishedMove = animState;
+          animState = null;
+
+          // Update logical peg stacks
+          pegs[finishedMove.from].pop();
+          pegs[finishedMove.to].push(finishedMove.disk);
+          currentMoveIndex = finishedMove.moveNumber;
+
+          // Recompute permanently solved disks on Peg C
+          recomputeSolvedDisks();
+          renderBoard();
+
+          if (currentMoveIndex === totalMoves) {
+            // Completed all moves!
+            highlightLine(6);
+            statusText.textContent = `Solved Tower of Hanoi for N=${numDisks}!`;
+            playVictoryChime();
+            isPlaying = false;
+            updatePlayPauseUI();
+          } else {
+            playPopSound(finishedMove.disk);
+            // Brief rhythmic pause between moves matching video cadence
+            const gapDelay = 45 / speedMultiplier;
+            pauseTimeoutId = setTimeout(() => {
+              if (isPlaying) startNextMove();
+            }, gapDelay);
+          }
+        }
+      }
+
+      // --- Jump Instantly to Any Move Index (0..totalMoves) ---
+      function jumpToMove(targetIdx) {
+        if (rafId) cancelAnimationFrame(rafId);
+        if (pauseTimeoutId) clearTimeout(pauseTimeoutId);
+        animState = null;
+
+        const clamped = Math.max(0, Math.min(totalMoves, targetIdx));
+        pegs = { A: [], B: [], C: [] };
+        for (let d = numDisks; d >= 1; d--) {
+          pegs.A.push(d);
+        }
+
+        for (let i = 0; i < clamped; i++) {
+          const m = movesList[i];
+          pegs[m.from].pop();
+          pegs[m.to].push(m.disk);
+        }
+
+        currentMoveIndex = clamped;
+        recomputeSolvedDisks();
+
+        moveCounter.textContent = `Move ${currentMoveIndex} / ${totalMoves}`;
+        if (currentMoveIndex === 0) {
+          highlightLine(3);
+          statusText.textContent = `Solving Tower of Hanoi for N=${numDisks}..`;
+        } else if (currentMoveIndex === totalMoves) {
+          highlightLine(6);
+          statusText.textContent = `Solved Tower of Hanoi for N=${numDisks}!`;
+        } else {
+          highlightLine(4);
+          statusText.textContent = `Solving Tower of Hanoi for N=${numDisks}..`;
+        }
+
+        renderBoard();
+      }
+
+      // --- Reset & Initialize Simulation ---
+      function resetSimulation(autoStart = true) {
+        if (rafId) cancelAnimationFrame(rafId);
+        if (pauseTimeoutId) clearTimeout(pauseTimeoutId);
+        animState = null;
+
+        totalMoves = Math.pow(2, numDisks) - 1;
+        movesList = generateMoves(numDisks);
+        mainTitle.textContent = `TOWER OF HANOI .N=${numDisks}`;
+        statusText.textContent = `Solving Tower of Hanoi for N=${numDisks}..`;
+
+        createDiskElements();
+        jumpToMove(0);
+
+        isPlaying = autoStart;
+        updatePlayPauseUI();
+
+        if (autoStart) {
+          pauseTimeoutId = setTimeout(() => {
+            startNextMove();
+          }, 350);
+        }
+      }
+
+      function updatePlayPauseUI() {
+        if (isPlaying) {
+          playPauseIcon.textContent = '❚❚';
+          playPauseLabel.textContent = 'Pause';
+        } else {
+          playPauseIcon.textContent = '▶';
+          playPauseLabel.textContent = currentMoveIndex >= totalMoves ? 'Replay' : 'Play';
+        }
+      }
+
+      // --- Event Listeners ---
+      btnPlayPause.addEventListener('click', () => {
+        initAudio();
+        if (currentMoveIndex >= totalMoves && !animState) {
+          resetSimulation(true);
+          return;
+        }
+        isPlaying = !isPlaying;
+        updatePlayPauseUI();
+        if (isPlaying) {
+          if (animState) {
+            // Resume mid-flight smoothly
+            animState.startTime = performance.now() - animState.duration * 0.25;
+            rafId = requestAnimationFrame(animateFrame);
+          } else {
+            startNextMove();
+          }
+        } else {
+          if (rafId) cancelAnimationFrame(rafId);
+          if (pauseTimeoutId) clearTimeout(pauseTimeoutId);
+        }
+      });
+
+      btnRestart.addEventListener('click', () => {
+        initAudio();
+        resetSimulation(true);
+      });
+
+      btnStepBack.addEventListener('click', () => {
+        initAudio();
+        isPlaying = false;
+        updatePlayPauseUI();
+        const target = animState ? currentMoveIndex : currentMoveIndex - 1;
+        jumpToMove(target);
+      });
+
+      btnStepForward.addEventListener('click', () => {
+        initAudio();
+        isPlaying = false;
+        updatePlayPauseUI();
+        const target = currentMoveIndex + 1;
+        jumpToMove(target);
+        if (target <= totalMoves && target > 0) {
+          if (target === totalMoves) playVictoryChime();
+          else playPopSound(movesList[target - 1].disk);
+        }
+      });
+
+      const speeds = [1, 1.5, 2, 3];
+      btnSpeed.addEventListener('click', () => {
+        const idx = speeds.indexOf(speedMultiplier);
+        speedMultiplier = speeds[(idx + 1) % speeds.length];
+        btnSpeed.textContent = `${speedMultiplier}x`;
+      });
+
+      diskCountSelect.addEventListener('change', (e) => {
+        initAudio();
+        numDisks = parseInt(e.target.value, 10) || 5;
+        resetSimulation(true);
+      });
+
+      btnSound.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        btnSound.textContent = soundEnabled ? '🔊' : '🔇';
+        if (soundEnabled) initAudio();
+      });
+
+      // Keep disk coordinates responsive on window resize
+      window.addEventListener('resize', () => {
+        if (!animState) {
+          renderBoard();
+        }
+      });
+
+      // Unlock audio context on first user click/tap anywhere
+      document.addEventListener('pointerdown', initAudio, { once: true });
+
+      // Start immediately on load just like the video
+      window.addEventListener('load', () => {
+        resetSimulation(true);
+      });
+    })();
+  </script>
+</body>
+</html>
