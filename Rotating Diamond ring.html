@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>py art.py — 3D ASCII Diamond Ring</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #000000;
+      color: #d4d4d4;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Custom subtle scrollbar for code drawer */
+    .code-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .code-scroll::-webkit-scrollbar-track {
+      background: #080808;
+    }
+    .code-scroll::-webkit-scrollbar-thumb {
+      background: #262626;
+      border-radius: 3px;
+    }
+    .code-scroll::-webkit-scrollbar-thumb:hover {
+      background: #404040;
+    }
+
+    /* Syntax highlighting mimicking the video's terminal editor */
+    .tok-kw { color: #c792ea; }
+    .tok-fn { color: #82aaff; }
+    .tok-num { color: #f78c6c; }
+    .tok-str { color: #c3e88d; }
+    .tok-com { color: #546e7a; font-style: italic; }
+    .tok-const { color: #ffcb6b; }
+    .tok-op { color: #89ddff; }
+    .tok-line-hl {
+      background: rgba(255, 255, 255, 0.05);
+      display: inline-block;
+      width: 100%;
+    }
+    .cursor-block {
+      display: inline-block;
+      width: 7px;
+      height: 14px;
+      background-color: #f43f5e;
+      vertical-align: middle;
+      animation: blink 1.1s steps(2, start) infinite;
+    }
+    @keyframes blink {
+      to { visibility: hidden; }
+    }
+  </style>
+</head>
+<body class="bg-black text-neutral-300 flex flex-col h-screen w-screen overflow-hidden">
+
+  <!-- Main Viewport Area -->
+  <div id="viewport-wrapper" class="relative flex-1 w-full min-h-0 flex flex-col justify-between overflow-hidden">
+    <!-- High-DPI ASCII Render Canvas -->
+    <canvas id="asciiCanvas"></canvas>
+
+    <!-- Top-Right Timer HUD (Exact match to video) -->
+    <div class="pointer-events-none absolute top-5 right-6 sm:top-7 sm:right-8 flex items-center gap-2 text-xs sm:text-sm tracking-wider">
+      <span class="inline-block w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.9)]"></span>
+      <span class="text-neutral-500">t</span>
+      <span id="hud-timer" class="text-neutral-200 font-normal tabular-nums">00.00s</span>
+    </div>
+
+    <!-- Top-Left Interactive Controls -->
+    <div class="absolute top-4 left-4 sm:top-6 sm:left-6 flex flex-wrap items-center gap-2 z-20">
+      <button id="btn-replay" title="Restart Build Sequence"
+        class="px-2.5 py-1.5 rounded bg-neutral-950/85 hover:bg-neutral-900 border border-neutral-800/90 text-[11px] sm:text-xs text-neutral-300 hover:text-white transition flex items-center gap-1.5 backdrop-blur-sm">
+        <svg class="w-3.5 h-3.5 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        <span>Replay</span>
+      </button>
+
+      <button id="btn-pause" title="Pause / Play Animation"
+        class="px-2.5 py-1.5 rounded bg-neutral-950/85 hover:bg-neutral-900 border border-neutral-800/90 text-[11px] sm:text-xs text-neutral-300 hover:text-white transition flex items-center gap-1.5 backdrop-blur-sm">
+        <span id="pause-icon" class="text-rose-400">❚❚</span>
+        <span id="pause-label">Pause</span>
+      </button>
+
+      <button id="btn-py-modal" title="View & Copy Complete Python art.py Code"
+        class="px-2.5 py-1.5 rounded bg-neutral-950/85 hover:bg-neutral-900 border border-rose-500/40 text-[11px] sm:text-xs text-rose-300 hover:text-white transition flex items-center gap-1.5 backdrop-blur-sm">
+        <span>🐍 View &amp; Copy Python (art.py)</span>
+      </button>
+
+      <button id="btn-toggle-code" title="Toggle Bottom Code Editor"
+        class="px-2.5 py-1.5 rounded bg-neutral-950/85 hover:bg-neutral-900 border border-neutral-800/90 text-[11px] sm:text-xs text-neutral-300 hover:text-white transition flex items-center gap-1.5 backdrop-blur-sm">
+        <span class="text-neutral-400">▸</span>
+        <span id="btn-code-label">Split View</span>
+      </button>
+    </div>
+
+    <!-- Bottom Terminal Telemetry HUD (Matching the video's bottom-left & bottom-right status) -->
+    <div class="pointer-events-none absolute bottom-3 left-4 right-4 sm:bottom-4 sm:left-7 sm:right-7 flex flex-col sm:flex-row sm:items-end justify-between gap-1 text-[10px] sm:text-xs text-neutral-500">
+      <div class="space-y-0.5">
+        <div class="text-neutral-400">@jin_22ee <span class="text-neutral-600">·</span> 2026</div>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-0.5">
+          <span>rotation <span id="hud-rotation" class="text-neutral-300 tabular-nums">000.00°</span></span>
+          <span>glints <span id="hud-glints" class="text-neutral-300 tabular-nums">0</span></span>
+          <span>letters <span id="hud-letters" class="text-neutral-300 tabular-nums">0</span></span>
+        </div>
+        <div class="text-neutral-300 pt-0.5">$ py art.py</div>
+      </div>
+      <div class="text-neutral-500">
+        running · <span class="text-neutral-300">30 fps</span>
+      </div>
+    </div>
+
+    <!-- Python Full Source Modal -->
+    <div id="py-modal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+      <div class="bg-[#09090b] border border-neutral-800 rounded-xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-neutral-800 bg-neutral-950">
+          <div class="flex items-center gap-2 text-xs sm:text-sm">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span class="font-semibold text-neutral-200">art.py</span>
+            <span class="text-neutral-500">— Complete Runnable Python Terminal Script</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="btn-copy-full-py" class="px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-medium transition">
+              Copy Python Code
+            </button>
+            <button id="btn-close-modal" class="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white text-xs transition">
+              ✕
+            </button>
+          </div>
+        </div>
+        <pre id="full-py-code" class="code-scroll flex-1 overflow-auto p-4 text-xs leading-relaxed text-neutral-300 select-all"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collapsible Python Source Viewer (Mimicking the scrolling code editor below the terminal in the video) -->
+  <div id="code-drawer" class="w-full bg-[#050505] border-t border-neutral-900 transition-all duration-300 ease-out overflow-hidden" style="height: 220px;">
+    <div class="max-w-4xl mx-auto h-full flex flex-col px-4 sm:px-7 py-2.5">
+      <div class="flex items-center justify-between text-[10px] sm:text-[11px] text-neutral-500 pb-1.5 border-b border-neutral-900/80">
+        <div class="flex items-center gap-3">
+          <span class="text-neutral-300 font-medium">art.py</span>
+          <span>numpy · procedural ascii ray-shade</span>
+        </div>
+        <div class="flex items-center gap-3">
+          <span id="code-phase-tag" class="text-rose-400/90">phase: draw_order()</span>
+          <button id="btn-copy-code" class="hover:text-neutral-200 transition">copy</button>
+        </div>
+      </div>
+      <div id="code-container" class="code-scroll flex-1 overflow-y-auto py-2 text-[11px] sm:text-xs leading-[1.55] font-mono text-neutral-400 whitespace-pre"></div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 3D ASCII Diamond Ring Simulation
+     * Faithfully replicates the procedural geometry, lighting, phased draw_order reveal,
+     * orbital sparkle trails, and terminal telemetry shown in `py art.py`.
+     */
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. CONSTANTS & PROCEDURAL GEOMETRY PARAMETERS (Matching art.py)
+      // =========================================================================
+      const TAU = Math.PI * 2;
+      const R_BAND = 0.56;          // Major radius of the vertical ring band
+      const TUBE_RX = 0.082;        // Cross-section radial thickness
+      const TUBE_RZ = 0.112;        // Cross-section depth thickness
+      const GIRDLE_R = 0.31;        // Prominent Diamond girdle radius
+      const TABLE_R = 0.185;        // Diamond flat top table radius
+      const CULET_Y = R_BAND + 0.02;// Pointed bottom tip nestled between prongs
+      const GIRDLE_Y = R_BAND + 0.21;
+      const TABLE_Y = R_BAND + 0.34;
+
+      // Center offset so the full ring + large diamond crown is perfectly framed
+      const MODEL_Y_OFFSET = -0.18;
+
+      const PART_BAND = 0;
+      const PART_PRONG = 1;
+      const PART_GEM = 2;
+
+      const SHADE_CHARS = ['.', ':', '-', '=', '+', '*', 'o', 'O', '0', '#', '@'];
+      const GLINT_CHARS = ['*', '+', '#', '✦', '0'];
+
+      // Vector math utilities
+      function cross3(ax, ay, az, bx, by, bz) {
+        return [
+          ay * bz - az * by,
+          az * bx - ax * bz,
+          ax * by - ay * bx
+        ];
+      }
+
+      function normalize3(x, y, z) {
+        const len = Math.hypot(x, y, z) || 1;
+        return [x / len, y / len, z / len];
+      }
+
+      // =========================================================================
+      // 2. PROCEDURAL 3D MESH GENERATORS (band, diamond, prongs, trails)
+      // =========================================================================
+
+      /**
+       * band(): Generates the metallic torus ring shank with bottom-to-top draw order.
+       */
+      function buildBand() {
+        const points = [];
+        const stepsU = 170;
+        const stepsV = 36;
+
+        for (let iu = 0; iu < stepsU; iu++) {
+          const u = (TAU * iu) / stepsU;
+          const cosU = Math.cos(u);
+          const sinU = Math.sin(u);
+
+          // Angle measured from bottom (-PI/2) up to top (+PI/2) -> [0, 1]
+          const angleFromBottom = Math.atan2(sinU, cosU) + Math.PI / 2;
+          const wrappedAngle = Math.atan2(Math.sin(angleFromBottom), Math.cos(angleFromBottom));
+          const order = Math.abs(wrappedAngle) / Math.PI;
+
+          for (let iv = 0; iv < stepsV; iv++) {
+            const v = (TAU * iv) / stepsV;
+            const cosV = Math.cos(v);
+            const sinV = Math.sin(v);
+
+            const r = R_BAND + TUBE_RX * cosV;
+            const px = r * cosU;
+            const py = r * sinU;
+            const pz = TUBE_RZ * sinV;
+
+            const [nx, ny, nz] = normalize3(
+              (cosV * cosU) / TUBE_RX,
+              (cosV * sinU) / TUBE_RX,
+              sinV / TUBE_RZ
+            );
+
+            points.push({
+              x: px, y: py, z: pz,
+              nx, ny, nz,
+              part: PART_BAND,
+              boost: 1.0,
+              order,
+              seed: (iu * 31 + iv * 17) % 997
+            });
+          }
+        }
+        return points;
+      }
+
+      /**
+       * diamond(): Generates a 57-facet brilliant-cut diamond with flat facet normals.
+       */
+      function buildDiamond() {
+        const points = [];
+        const m = 16;
+
+        function addFacet(a, b, c, boost, resU, resV) {
+          const abx = b[0] - a[0], aby = b[1] - a[1], abz = b[2] - a[2];
+          const acx = c[0] - a[0], acy = c[1] - a[1], acz = c[2] - a[2];
+          let [nx, ny, nz] = cross3(abx, aby, abz, acx, acy, acz);
+          [nx, ny, nz] = normalize3(nx, ny, nz);
+
+          // Ensure normal points outward from diamond center
+          const cx = (a[0] + b[0] + c[0]) / 3;
+          const cy = (a[1] + b[1] + c[1]) / 3 - (CULET_Y + TABLE_Y) * 0.5;
+          const cz = (a[2] + b[2] + c[2]) / 3;
+          if (nx * cx + ny * cy + nz * cz < 0) {
+            nx = -nx; ny = -ny; nz = -nz;
+          }
+
+          for (let iu = 0; iu <= resU; iu++) {
+            const u = iu / resU;
+            for (let iv = 0; iv <= resV; iv++) {
+              const v = iv / resV;
+              if (u + v > 1.0001) continue;
+
+              const px = a[0] + abx * u + acx * v;
+              const py = a[1] + aby * u + acy * v;
+              const pz = a[2] + abz * u + acz * v;
+
+              // Reveal order from bottom culet (0) to top table (1)
+              const order = Math.max(0, Math.min(1, (py - CULET_Y) / (TABLE_Y - CULET_Y)));
+              const isEdge = iu === 0 || iv === 0 || Math.abs(u + v - 1) < 0.08;
+
+              points.push({
+                x: px, y: py, z: pz,
+                nx, ny, nz,
+                part: PART_GEM,
+                boost: isEdge ? boost * 1.25 : boost,
+                order,
+                seed: Math.floor((u * 97 + v * 53 + boost * 19) * 100) % 997
+              });
+            }
+          }
+        }
+
+        const culet = [0, CULET_Y, 0];
+        const tableCenter = [0, TABLE_Y, 0];
+
+        for (let i = 0; i < m; i++) {
+          const a0 = (TAU * i) / m;
+          const a1 = (TAU * (i + 1)) / m;
+          const aMid = (a0 + a1) * 0.5;
+
+          const g0 = [GIRDLE_R * Math.cos(a0), GIRDLE_Y, GIRDLE_R * Math.sin(a0)];
+          const g1 = [GIRDLE_R * Math.cos(a1), GIRDLE_Y, GIRDLE_R * Math.sin(a1)];
+          const gMid = [
+            (GIRDLE_R * 1.02) * Math.cos(aMid),
+            GIRDLE_Y - 0.005,
+            (GIRDLE_R * 1.02) * Math.sin(aMid)
+          ];
+
+          const t0 = [TABLE_R * Math.cos(a0), TABLE_Y, TABLE_R * Math.sin(a0)];
+          const t1 = [TABLE_R * Math.cos(a1), TABLE_Y, TABLE_R * Math.sin(a1)];
+
+          const sMid = [
+            ((GIRDLE_R + TABLE_R) * 0.52) * Math.cos(aMid),
+            (GIRDLE_Y + TABLE_Y) * 0.52,
+            ((GIRDLE_R + TABLE_R) * 0.52) * Math.sin(aMid)
+          ];
+
+          // Crown facets
+          addFacet(g0, gMid, sMid, 1.32, 8, 8);
+          addFacet(gMid, g1, sMid, 1.32, 8, 8);
+          addFacet(g0, sMid, t0, 1.38, 8, 8);
+          addFacet(sMid, g1, t1, 1.38, 8, 8);
+          addFacet(t0, sMid, t1, 1.42, 8, 8);
+
+          // Pavilion facets
+          addFacet(g0, culet, gMid, 1.24, 10, 10);
+          addFacet(gMid, culet, g1, 1.24, 10, 10);
+
+          // Flat top table facets
+          addFacet(tableCenter, t0, t1, 1.28, 9, 9);
+        }
+
+        return points;
+      }
+
+      /**
+       * prongs(): Generates 4 sculpted curved prongs rising from the upper band
+       * to clasp the diamond girdle at 45°, 135°, 225°, and 315°.
+       */
+      function buildProngs() {
+        const points = [];
+        const prongRadius = 0.028;
+
+        for (let i = 0; i < 4; i++) {
+          const a = (TAU * (i + 0.5)) / 4;
+          const cosA = Math.cos(a);
+          const sinA = Math.sin(a);
+
+          const base = [
+            0.10 * cosA,
+            R_BAND - 0.01,
+            0.10 * sinA
+          ];
+          const tip = [
+            (GIRDLE_R + 0.016) * cosA,
+            GIRDLE_Y + 0.032,
+            (GIRDLE_R + 0.016) * sinA
+          ];
+
+          const dx = tip[0] - base[0];
+          const dy = tip[1] - base[1];
+          const dz = tip[2] - base[2];
+          const [ux, uy, uz] = normalize3(dx, dy, dz);
+
+          let [sx, sy, sz] = cross3(ux, uy, uz, 0, 0, 1);
+          if (Math.hypot(sx, sy, sz) < 1e-4) {
+            [sx, sy, sz] = cross3(ux, uy, uz, 1, 0, 0);
+          }
+          [sx, sy, sz] = normalize3(sx, sy, sz);
+          const [wx, wy, wz] = cross3(sx, sy, sz, ux, uy, uz);
+
+          const stepsU = 34;
+          const stepsPhi = 18;
+
+          for (let iu = 0; iu <= stepsU; iu++) {
+            const u = iu / stepsU;
+            // Subtle outward curve for sculptural basket feel
+            const curve = Math.sin(u * Math.PI) * 0.024;
+            const cx = base[0] + dx * u + cosA * curve;
+            const cy = base[1] + dy * u;
+            const cz = base[2] + dz * u + sinA * curve;
+
+            for (let ip = 0; ip < stepsPhi; ip++) {
+              const phi = (TAU * ip) / stepsPhi;
+              const cosP = Math.cos(phi);
+              const sinP = Math.sin(phi);
+
+              const nx = cosP * sx + sinP * wx;
+              const ny = cosP * sy + sinP * wy;
+              const nz = cosP * sz + sinP * wz;
+
+              const rScale = prongRadius * (1 - u * 0.18);
+              points.push({
+                x: cx + nx * rScale,
+                y: cy + ny * rScale,
+                z: cz + nz * rScale,
+                nx, ny, nz,
+                part: PART_PRONG,
+                boost: 1.15,
+                order: u,
+                seed: (i * 101 + iu * 13 + ip * 7) % 997
+              });
+            }
+          }
+        }
+        return points;
+      }
+
+      /**
+       * Orbital sparkle dust rings & ambient background starlight
+       */
+      function buildOrbitTrails() {
+        const trails = [];
+        const rings = [
+          { rx: 1.05, rz: 1.05, tiltX: 0.38, tiltZ: -0.22, yOff: 0.14, count: 140, speed: 0.42 },
+          { rx: 1.24, rz: 1.24, tiltX: -0.32, tiltZ: 0.28, yOff: 0.06, count: 160, speed: -0.31 }
+        ];
+
+        rings.forEach((cfg, rIdx) => {
+          for (let i = 0; i < cfg.count; i++) {
+            trails.push({
+              baseAngle: (TAU * i) / cfg.count,
+              rx: cfg.rx + Math.sin(i * 7.3) * 0.03,
+              rz: cfg.rz + Math.cos(i * 5.1) * 0.03,
+              tiltX: cfg.tiltX,
+              tiltZ: cfg.tiltZ,
+              yOff: cfg.yOff,
+              speed: cfg.speed,
+              bright: i % 9 === 0,
+              seed: rIdx * 500 + i
+            });
+          }
+        });
+        return trails;
+      }
+
+      function buildAmbientStars() {
+        const stars = [];
+        for (let i = 0; i < 65; i++) {
+          const h1 = Math.sin(i * 12.9898) * 43758.5453;
+          const h2 = Math.sin(i * 78.233) * 43758.5453;
+          const h3 = Math.sin(i * 39.425) * 43758.5453;
+          stars.push({
+            nx: h1 - Math.floor(h1),
+            ny: h2 - Math.floor(h2),
+            phase: (h3 - Math.floor(h3)) * TAU,
+            freq: 1.2 + (i % 5) * 0.45,
+            isCross: i % 11 === 0
+          });
+        }
+        return stars;
+      }
+
+      // Build static geometry once
+      const RING_POINTS = [
+        ...buildBand(),
+        ...buildProngs(),
+        ...buildDiamond()
+      ];
+      const ORBIT_TRAILS = buildOrbitTrails();
+      const AMBIENT_STARS = buildAmbientStars();
+
+      // =========================================================================
+      // 3. CANVAS, CAMERA INTERACTION & UI STATE
+      // =========================================================================
+      const canvas = document.getElementById('asciiCanvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const viewportWrapper = document.getElementById('viewport-wrapper');
+
+      const hudTimer = document.getElementById('hud-timer');
+      const hudRotation = document.getElementById('hud-rotation');
+      const hudGlints = document.getElementById('hud-glints');
+      const hudLetters = document.getElementById('hud-letters');
+      const codePhaseTag = document.getElementById('code-phase-tag');
+
+      let width = 0;
+      let height = 0;
+      let dpr = 1;
+
+      function resizeCanvas() {
+        const rect = viewportWrapper.getBoundingClientRect();
+        width = Math.max(1, Math.floor(rect.width));
+        height = Math.max(1, Math.floor(rect.height));
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+
+      // Simulation & Camera Orbit State
+      let simTime = 0;
+      let lastFrameTime = performance.now();
+      let isPaused = false;
+      let autoSpin = true;
+      let manualYaw = 0;
+      let manualPitch = 0.14;
+      let zoomScale = 1.0;
+
+      // Mouse & Touch Orbit Controls
+      let isDragging = false;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let startYaw = 0;
+      let startPitch = 0;
+
+      canvas.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        startYaw = manualYaw;
+        startPitch = manualPitch;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        manualYaw = startYaw + dx * 0.008;
+        manualPitch = Math.max(-1.1, Math.min(1.1, startPitch + dy * 0.006));
+      });
+
+      window.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+
+      canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        zoomScale = Math.max(0.55, Math.min(2.0, zoomScale - e.deltaY * 0.0008));
+      }, { passive: false });
+
+      // Touch drag support
+      canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          isDragging = true;
+          dragStartX = e.touches[0].clientX;
+          dragStartY = e.touches[0].clientY;
+          startYaw = manualYaw;
+          startPitch = manualPitch;
+        }
+      }, { passive: true });
+
+      canvas.addEventListener('touchmove', (e) => {
+        if (!isDragging || e.touches.length !== 1) return;
+        const dx = e.touches[0].clientX - dragStartX;
+        const dy = e.touches[0].clientY - dragStartY;
+        manualYaw = startYaw + dx * 0.009;
+        manualPitch = Math.max(-1.1, Math.min(1.1, startPitch + dy * 0.007));
+      }, { passive: true });
+
+      canvas.addEventListener('touchend', () => {
+        isDragging = false;
+      });
+
+      // Control buttons
+      document.getElementById('btn-replay').addEventListener('click', () => {
+        simTime = 0;
+        manualYaw = 0;
+        manualPitch = 0.14;
+        zoomScale = 1.0;
+        isPaused = false;
+        document.getElementById('pause-icon').textContent = '❚❚';
+        document.getElementById('pause-label').textContent = 'Pause';
+      });
+
+      document.getElementById('btn-pause').addEventListener('click', () => {
+        isPaused = !isPaused;
+        document.getElementById('pause-icon').textContent = isPaused ? '▶' : '❚❚';
+        document.getElementById('pause-label').textContent = isPaused ? 'Play' : 'Pause';
+      });
+
+      // Full Python (art.py) Modal Logic
+      const FULL_PYTHON_SOURCE = `import time, math
+import numpy as np
+
+TAU = math.tau
+R_BAND = 0.56
+GIRDLE_R = 0.31
+TABLE_R = 0.185
+CULET_Y = R_BAND + 0.02
+GIRDLE_Y = R_BAND + 0.21
+TABLE_Y = R_BAND + 0.34
+DRAW = (0.3, 5.6)
+TURN = 11.0
+
+def band():
+    u, v = [x.ravel() for x in np.meshgrid(np.linspace(0, TAU, 150), np.linspace(0, TAU, 34))]
+    rx, rz = 0.082, 0.112
+    x = (R_BAND + rx * np.cos(v)) * np.cos(u)
+    y = (R_BAND + rx * np.cos(v)) * np.sin(u)
+    z = rz * np.sin(v)
+    P = np.stack([x, y, z], axis=1)
+    N = np.stack([np.cos(v)*np.cos(u), np.cos(v)*np.sin(u), np.sin(v)], axis=1)
+    return P, N / np.linalg.norm(N, axis=1, keepdims=True)
+
+def diamond():
+    """57 facets, each with its own flat normal (that is what makes it sparkle)"""
+    P, N, F = [], [], []
+    k = 0
+    def facet(corners, n, boost=1.25):
+        nonlocal k
+        u, v = [x.ravel() for x in np.meshgrid(np.linspace(0, 1, 16), np.linspace(0, 1, 16))]
+        keep = u + v <= 1
+        a, b, c = corners
+        pts = a + (b - a) * u[keep, None] + (c - a) * v[keep, None]
+        P.append(pts)
+        N.append(np.tile(n / np.linalg.norm(n), (len(pts), 1)))
+        F.append(np.full(len(pts), boost))
+        k += 1
+
+    m = 16
+    for i in range(m):
+        a0, a1 = TAU * i / m, TAU * (i + 1) / m
+        g0 = np.array([GIRDLE_R * np.cos(a0), GIRDLE_Y, GIRDLE_R * np.sin(a0)])
+        g1 = np.array([GIRDLE_R * np.cos(a1), GIRDLE_Y, GIRDLE_R * np.sin(a1)])
+        t0 = np.array([TABLE_R * np.cos(a0), TABLE_Y, TABLE_R * np.sin(a0)])
+        t1 = np.array([TABLE_R * np.cos(a1), TABLE_Y, TABLE_R * np.sin(a1)])
+        culet = np.array([0.0, CULET_Y, 0.0])
+        crown = np.cross(g1 - g0, t0 - g0)
+        crown *= np.sign(crown[1]) or 1
+        facet((g0, g1, t0), crown)
+        facet((g1, t1, t0), crown * [1, 1.15, 1])
+        pav = np.cross(culet - g0, g1 - g0)
+        pav *= -np.sign(pav[1]) or 1
+        facet((g0, g1, culet), pav)
+        facet((np.array([0.0, TABLE_Y, 0.0]), t0, t1), np.array([0.0, 1.0, 0.0]))
+    return np.concatenate(P), np.concatenate(N), np.concatenate(F)
+
+def prongs():
+    P, N = [], []
+    for i in range(4):
+        a = TAU * (i + 0.5) / 4
+        base = np.array([0.10 * np.cos(a), R_BAND - 0.01, 0.10 * np.sin(a)])
+        tip  = np.array([(GIRDLE_R + 0.016) * np.cos(a), GIRDLE_Y + 0.032, (GIRDLE_R + 0.016) * np.sin(a)])
+        u, phi = [x.ravel() for x in np.meshgrid(np.linspace(0, 1, 28), np.linspace(0, TAU, 16))]
+        d = (tip - base) / np.linalg.norm(tip - base)
+        s = np.cross(d, [0.0, 0.0, 1.0]); s /= np.linalg.norm(s)
+        w = np.cross(s, d)
+        n = np.cos(phi)[:, None] * s + np.sin(phi)[:, None] * w
+        P.append(base + u[:, None] * (tip - base) + n * 0.028)
+        N.append(n)
+    return np.concatenate(P), np.concatenate(N)
+
+def lights(t):
+    key = np.array([0.0, 0.8, 0.6])
+    rim = np.array([np.cos(t * 0.9), 0.5, np.sin(t * 0.9)])
+    return key / np.linalg.norm(key), rim / np.linalg.norm(rim)
+
+def spin(t):
+    return TAU * max(t - DRAW[1] - 0.6, 0) / TURN
+
+def rot_y(p, a):
+    c, s = np.cos(a), np.sin(a)
+    return np.stack([c * p[:, 0] + s * p[:, 2], p[:, 1], -s * p[:, 0] + c * p[:, 2]], axis=1)
+`;
+
+      const pyModal = document.getElementById('py-modal');
+      const fullPyCodeEl = document.getElementById('full-py-code');
+      fullPyCodeEl.textContent = FULL_PYTHON_SOURCE;
+
+      document.getElementById('btn-py-modal').addEventListener('click', () => {
+        pyModal.classList.remove('hidden');
+      });
+      document.getElementById('btn-close-modal').addEventListener('click', () => {
+        pyModal.classList.add('hidden');
+      });
+      pyModal.addEventListener('click', (e) => {
+        if (e.target === pyModal) pyModal.classList.add('hidden');
+      });
+      document.getElementById('btn-copy-full-py').addEventListener('click', () => {
+        const ta = document.createElement('textarea');
+        ta.value = FULL_PYTHON_SOURCE;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        const btn = document.getElementById('btn-copy-full-py');
+        btn.textContent = 'Copied ✓';
+        setTimeout(() => (btn.textContent = 'Copy Python Code'), 1600);
+      });
+
+      const codeDrawer = document.getElementById('code-drawer');
+      const btnCodeLabel = document.getElementById('btn-code-label');
+      let drawerOpen = true;
+      document.getElementById('btn-toggle-code').addEventListener('click', () => {
+        drawerOpen = !drawerOpen;
+        codeDrawer.style.height = drawerOpen ? '220px' : '0px';
+        codeDrawer.style.borderTopWidth = drawerOpen ? '1px' : '0px';
+        btnCodeLabel.textContent = drawerOpen ? 'Split View' : 'Show Code';
+        setTimeout(resizeCanvas, 310);
+      });
+
+      // =========================================================================
+      // 4. PYTHON CODE VIEWER CONTENT (Synchronized with Animation Phases)
+      // =========================================================================
+      const PYTHON_LINES = [
+        { ln: 45, html: `<span class="tok-str">"""57 facets, each with its own flat normal (that is what makes it sp</span>` },
+        { ln: 46, html: `P, N, F <span class="tok-op">=</span> [], [], []` },
+        { ln: 48, html: `<span class="tok-kw">def</span> <span class="tok-fn">facet</span>(corners, n):` },
+        { ln: 49, html: `    <span class="tok-kw">nonlocal</span> k` },
+        { ln: 50, html: `    u, v <span class="tok-op">=</span> [x.ravel() <span class="tok-kw">for</span> x <span class="tok-kw">in</span> np.meshgrid(np.linspace(<span class="tok-num">0</span>, <span class="tok-num">1</span>, <span class="tok-num">16</span>), np.linspace(<span class="tok-num">0</span>, <span class="tok-num">1</span>, <span class="tok-num">16</span>))]` },
+        { ln: 51, html: `    keep <span class="tok-op">=</span> u <span class="tok-op">+</span> v <span class="tok-op">&lt;=</span> <span class="tok-num">1</span>` },
+        { ln: 52, html: `    a, b, c <span class="tok-op">=</span> corners` },
+        { ln: 53, html: `    pts <span class="tok-op">=</span> a <span class="tok-op">+</span> (b <span class="tok-op">-</span> a) <span class="tok-op">*</span> u[keep, <span class="tok-const">None</span>] <span class="tok-op">+</span> (c <span class="tok-op">-</span> a) <span class="tok-op">*</span> v[keep, <span class="tok-const">None</span>]` },
+        { ln: 54, html: `    P.append(pts); N.append(np.tile(n / np.linalg.norm(n), (len(pts), <span class="tok-num">1</span>)))` },
+        { ln: 58, html: `m <span class="tok-op">=</span> <span class="tok-num">16</span>` },
+        { ln: 59, html: `<span class="tok-kw">for</span> i <span class="tok-kw">in</span> range(m):` },
+        { ln: 60, html: `    a0, a1 <span class="tok-op">=</span> <span class="tok-const">TAU</span> <span class="tok-op">*</span> i / m, <span class="tok-const">TAU</span> <span class="tok-op">*</span> (i <span class="tok-op">+</span> <span class="tok-num">1</span>) / m` },
+        { ln: 61, html: `    g0 <span class="tok-op">=</span> np.array([<span class="tok-const">GIRDLE_R</span> <span class="tok-op">*</span> np.cos(a0), <span class="tok-const">GIRDLE_Y</span>, <span class="tok-const">GIRDLE_R</span> <span class="tok-op">*</span> np.sin(a0)])` },
+        { ln: 62, html: `    g1 <span class="tok-op">=</span> np.array([<span class="tok-const">GIRDLE_R</span> <span class="tok-op">*</span> np.cos(a1), <span class="tok-const">GIRDLE_Y</span>, <span class="tok-const">GIRDLE_R</span> <span class="tok-op">*</span> np.sin(a1)])` },
+        { ln: 63, html: `    t0 <span class="tok-op">=</span> np.array([<span class="tok-const">TABLE_R</span> <span class="tok-op">*</span> np.cos(a0), <span class="tok-const">TABLE_Y</span>, <span class="tok-const">TABLE_R</span> <span class="tok-op">*</span> np.sin(a0)])` },
+        { ln: 65, html: `    culet <span class="tok-op">=</span> np.array([<span class="tok-num">0</span>, <span class="tok-const">CULET_Y</span>, <span class="tok-num">0</span>])` },
+        { ln: 69, html: `    facet((g1, t1, t0), crown <span class="tok-op">*</span> [<span class="tok-num">1</span>, <span class="tok-num">1.15</span>, <span class="tok-num">1</span>])` },
+        { ln: 77, html: `<span class="tok-kw">def</span> <span class="tok-fn">prongs</span>():` },
+        { ln: 79, html: `    <span class="tok-kw">for</span> i <span class="tok-kw">in</span> range(<span class="tok-num">4</span>):` },
+        { ln: 80, html: `        a <span class="tok-op">=</span> <span class="tok-const">TAU</span> <span class="tok-op">*</span> (i <span class="tok-op">+</span> <span class="tok-num">0.5</span>) / <span class="tok-num">4</span>` },
+        { ln: 81, html: `        base <span class="tok-op">=</span> np.array([<span class="tok-num">0.08</span> <span class="tok-op">*</span> np.cos(a), <span class="tok-const">R_BAND</span> <span class="tok-op">-</span> <span class="tok-num">0.02</span>, <span class="tok-num">0.08</span> <span class="tok-op">*</span> np.sin(a)])` },
+        { ln: 82, html: `        tip  <span class="tok-op">=</span> np.array([(<span class="tok-const">GIRDLE_R</span> <span class="tok-op">+</span> <span class="tok-num">0.015</span>) <span class="tok-op">*</span> np.cos(a), <span class="tok-const">TABLE_Y</span> <span class="tok-op">-</span> <span class="tok-num">0.03</span>, (<span class="tok-const">GIRDLE_R</span> <span class="tok-op">+</span> <span class="tok-num">0.015</span>) <span class="tok-op">*</span> np.sin(a)])` },
+        { ln: 102, html: `<span class="tok-com"># -- light: a key light, a moving rim light, and a sparkle light --</span>` },
+        { ln: 104, html: `<span class="tok-kw">def</span> <span class="tok-fn">lights</span>(t):` },
+        { ln: 105, html: `    key <span class="tok-op">=</span> np.array([<span class="tok-num">0.0</span>, <span class="tok-num">0.8</span>, <span class="tok-num">0.6</span>])` },
+        { ln: 106, html: `    rim <span class="tok-op">=</span> np.array([np.cos(t <span class="tok-op">*</span> <span class="tok-num">0.9</span>), <span class="tok-num">0.5</span>, np.sin(t <span class="tok-op">*</span> <span class="tok-num">0.9</span>)])` },
+        { ln: 107, html: `    <span class="tok-kw">return</span> key / np.linalg.norm(key), rim / np.linalg.norm(rim)` },
+        { ln: 110, html: `<span class="tok-kw">def</span> <span class="tok-fn">spin</span>(t):` },
+        { ln: 111, html: `    <span class="tok-kw">return</span> <span class="tok-const">TAU</span> <span class="tok-op">*</span> max(t <span class="tok-op">-</span> <span class="tok-const">DRAW</span>[<span class="tok-num">1</span>] <span class="tok-op">-</span> <span class="tok-num">0.6</span>, <span class="tok-num">0</span>) / <span class="tok-const">TURN</span>` },
+        { ln: 119, html: `<span class="tok-kw">def</span> <span class="tok-fn">draw_order</span>():` },
+        { ln: 120, html: `    <span class="tok-str">"""when each point appears: the band draws itself from the bottom up</span>` },
+        { ln: 121, html: `    <span class="tok-str">then the prongs rise, then the diamond fills in from its tip"""</span>` },
+        { ln: 123, html: `    up_band <span class="tok-op">=</span> np.abs(np.angle(np.exp(<span class="tok-num">1j</span> <span class="tok-op">*</span> (np.arctan2(p[:, <span class="tok-num">1</span>], p[:, <span class="tok-num">0</span>]) <span class="tok-op">+</span> np.pi / <span class="tok-num">2</span>)))) / np.pi` },
+        { ln: 124, html: `    prong <span class="tok-op">=</span> <span class="tok-num">1.0</span> <span class="tok-op">+</span> (p[:, <span class="tok-num">1</span>] <span class="tok-op">-</span> <span class="tok-const">R_BAND</span>) / (<span class="tok-const">TABLE_Y</span> <span class="tok-op">-</span> <span class="tok-const">R_BAND</span>) <span class="tok-op">*</span> <span class="tok-num">0.25</span>` },
+        { ln: 125, html: `    gem <span class="tok-op">=</span> <span class="tok-num">1.25</span> <span class="tok-op">+</span> (p[:, <span class="tok-num">1</span>] <span class="tok-op">-</span> <span class="tok-const">CULET_Y</span>) / (<span class="tok-const">TABLE_Y</span> <span class="tok-op">-</span> <span class="tok-const">CULET_Y</span>) <span class="tok-op">*</span> <span class="tok-num">0.45</span>` }
+      ];
+
+      const codeContainer = document.getElementById('code-container');
+      function renderCodeLines(activeLn) {
+        codeContainer.innerHTML = PYTHON_LINES.map(item => {
+          const isHl = item.ln === activeLn;
+          const numStr = String(item.ln).padStart(3, ' ');
+          return `<div id="code-ln-${item.ln}" class="${isHl ? 'tok-line-hl' : ''}"><span class="text-neutral-600 select-none mr-4">${numStr}</span>${item.html}${isHl ? ' <span class="cursor-block"></span>' : ''}</div>`;
+        }).join('');
+      }
+      renderCodeLines(120);
+
+      document.getElementById('btn-copy-code').addEventListener('click', () => {
+        const plain = PYTHON_LINES.map(l => `${String(l.ln).padStart(3, ' ')}  ${l.html.replace(/<[^>]+>/g, '')}`).join('\n');
+        const ta = document.createElement('textarea');
+        ta.value = plain;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        const btn = document.getElementById('btn-copy-code');
+        btn.textContent = 'copied!';
+        setTimeout(() => (btn.textContent = 'copy'), 1500);
+      });
+
+      // =========================================================================
+      // 5. ASCII CHARACTER GRID RASTERIZER & LIGHTING SHADER
+      // =========================================================================
+      let lastHighlightedLine = -1;
+
+      function syncCodeHighlight(t) {
+        let targetLn = 120;
+        let phaseLabel = 'phase: draw_order()';
+        if (t < 1.35) {
+          targetLn = 123;
+          phaseLabel = 'phase: band() [bottom-up]';
+        } else if (t < 2.35) {
+          targetLn = 81;
+          phaseLabel = 'phase: prongs() [rising]';
+        } else if (t < 3.65) {
+          targetLn = 65;
+          phaseLabel = 'phase: diamond() [57 facets]';
+        } else if (t < 6.0) {
+          targetLn = 105;
+          phaseLabel = 'phase: lights(t) [key + rim]';
+        } else {
+          targetLn = 111;
+          phaseLabel = 'phase: spin(t) [rot_y + glints]';
+        }
+
+        if (targetLn !== lastHighlightedLine) {
+          lastHighlightedLine = targetLn;
+          codePhaseTag.textContent = phaseLabel;
+          renderCodeLines(targetLn);
+          const el = document.getElementById(`code-ln-${targetLn}`);
+          if (el && drawerOpen) {
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }
+      }
+
+      function renderFrame(t) {
+        // Clear pitch-black background
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, width, height);
+
+        // Adaptive ASCII cell sizing
+        const minDim = Math.min(width, height);
+        const cellW = minDim < 520 ? 5.2 : 6.4;
+        const cellH = minDim < 520 ? 8.8 : 10.6;
+        const fontSize = minDim < 520 ? 9.5 : 11.2;
+
+        const cols = Math.floor(width / cellW);
+        const rows = Math.floor(height / cellH);
+        const totalCells = cols * rows;
+
+        // Z-buffer and cell buffers
+        const zBuf = new Float32Array(totalCells);
+        zBuf.fill(-1e9);
+        const charBuf = new Array(totalCells);
+        const lumBuf = new Float32Array(totalCells);
+        const glintBuf = new Uint8Array(totalCells);
+
+        // Phased Draw-Order Timeline
+        const bandProgress = Math.max(0, Math.min(1, (t - 0.25) / 1.2));
+        const prongProgress = Math.max(0, Math.min(1, (t - 1.35) / 1.0));
+        const gemProgress = Math.max(0, Math.min(1, (t - 2.25) / 1.35));
+
+        const spinStart = 3.85;
+        const autoYaw = autoSpin && t > spinStart
+          ? ((t - spinStart) * 0.58)
+          : 0;
+        const totalYaw = autoYaw + manualYaw;
+        const totalPitch = manualPitch;
+
+        const cosY = Math.cos(totalYaw);
+        const sinY = Math.sin(totalYaw);
+        const cosX = Math.cos(totalPitch);
+        const sinX = Math.sin(totalPitch);
+
+        // Lights matching `lights(t)` in art.py
+        const [kx, ky, kz] = normalize3(0.0, 0.8, 0.6);
+        const [rx, ry, rz] = normalize3(Math.cos(t * 0.9), 0.5, Math.sin(t * 0.9));
+
+        const projScale = Math.min(width, height) * 0.54 * zoomScale;
+        const centerX = width * 0.5;
+        const centerY = height * 0.52;
+        const cameraDist = 3.1;
+
+        // Stage A: Initial Seed Core
+        if (t < 0.95) {
+          const coreFade = t < 0.25 ? (t / 0.25) : Math.max(0, 1 - (t - 0.25) / 0.7);
+          const seedCols = 14;
+          const seedRows = 8;
+          const startC = Math.floor(cols / 2 - seedCols / 2);
+          const startR = Math.floor(rows / 2 - seedRows / 2 + 2);
+
+          for (let sr = 0; sr < seedRows; sr++) {
+            for (let sc = 0; sc < seedCols; sc++) {
+              const dx = (sc - seedCols / 2) / (seedCols / 2);
+              const dy = (sr - seedRows / 2) / (seedRows / 2);
+              const dist = Math.hypot(dx, dy);
+              if (dist > 1.05) continue;
+
+              const c = startC + sc;
+              const r = startR + sr;
+              if (c < 0 || c >= cols || r < 0 || r >= rows) continue;
+              const idx = r * cols + c;
+
+              const hash = Math.sin(sr * 19.1 + sc * 7.3 + Math.floor(t * 24)) * 43758.5;
+              const frac = hash - Math.floor(hash);
+              const ch = dist < 0.45 ? (frac > 0.5 ? '0' : 'o') : (frac > 0.6 ? ':' : '.');
+              zBuf[idx] = -0.5;
+              charBuf[idx] = ch;
+              lumBuf[idx] = (1 - dist * 0.6) * coreFade * 0.85;
+              if (frac > 0.94 && coreFade > 0.5) glintBuf[idx] = 1;
+            }
+          }
+        }
+
+        // Stage B: Project & Shade 3D Ring Geometry
+        for (let i = 0; i < RING_POINTS.length; i++) {
+          const pt = RING_POINTS[i];
+
+          if (pt.part === PART_BAND) {
+            if (pt.order > bandProgress) continue;
+          } else if (pt.part === PART_PRONG) {
+            if (prongProgress <= 0 || pt.order > prongProgress) continue;
+          } else if (pt.part === PART_GEM) {
+            if (gemProgress <= 0 || pt.order > gemProgress) continue;
+          }
+
+          const py0 = pt.y + MODEL_Y_OFFSET;
+
+          // Rotate around Y axis
+          const x1 = pt.x * cosY + pt.z * sinY;
+          const y1 = py0;
+          const z1 = -pt.x * sinY + pt.z * cosY;
+
+          // Rotate around X axis
+          const x2 = x1;
+          const y2 = y1 * cosX - z1 * sinX;
+          const z2 = y1 * sinX + z1 * cosX;
+
+          const depth = cameraDist - z2;
+          if (depth <= 0.2) continue;
+          const invZ = 1.0 / depth;
+
+          const screenX = centerX + x2 * projScale * invZ * cameraDist * 0.58;
+          const screenY = centerY - y2 * projScale * invZ * cameraDist * 0.58;
+
+          const col = Math.floor(screenX / cellW);
+          const row = Math.floor(screenY / cellH);
+
+          if (col < 0 || col >= cols || row < 0 || row >= rows) continue;
+          const cellIdx = row * cols + col;
+
+          if (z2 <= zBuf[cellIdx]) continue;
+          zBuf[cellIdx] = z2;
+
+          // Rotate normal vector
+          const nx1 = pt.nx * cosY + pt.nz * sinY;
+          const ny1 = pt.ny;
+          const nz1 = -pt.nx * sinY + pt.nz * cosY;
+
+          const nx2 = nx1;
+          const ny2 = ny1 * cosX - nz1 * sinX;
+          const nz2 = ny1 * sinX + nz1 * cosX;
+
+          const viewDot = Math.max(0, nz2);
+
+          const diffKey = Math.max(0, nx2 * kx + ny2 * ky + nz2 * kz);
+          const diffRim = Math.max(0, nx2 * rx + ny2 * ry + nz2 * rz);
+
+          const [hx1, hy1, hz1] = normalize3(kx, ky, kz + 1.0);
+          const specKey = Math.pow(Math.max(0, nx2 * hx1 + ny2 * hy1 + nz2 * hz1), pt.part === PART_GEM ? 28 : 18);
+
+          const [hx2, hy2, hz2] = normalize3(rx, ry, rz + 1.0);
+          const specRim = Math.pow(Math.max(0, nx2 * hx2 + ny2 * hy2 + nz2 * hz2), pt.part === PART_GEM ? 22 : 14);
+
+          const fresnel = Math.pow(1.0 - viewDot, 2.4) * 0.42;
+          const depthShade = 0.68 + 0.32 * ((z2 + 0.8) / 1.6);
+
+          let lum = (0.14 + diffKey * 0.56 + diffRim * 0.34 + fresnel) * pt.boost * depthShade;
+          const specTotal = specKey * 0.95 + specRim * 0.75;
+          lum += specTotal * 0.65;
+
+          let isLeadingEdge = false;
+          if (pt.part === PART_BAND && bandProgress < 0.99 && Math.abs(pt.order - bandProgress) < 0.045) {
+            lum += 0.45;
+            isLeadingEdge = true;
+          } else if (pt.part === PART_PRONG && prongProgress < 0.99 && Math.abs(pt.order - prongProgress) < 0.08) {
+            lum += 0.45;
+            isLeadingEdge = true;
+          } else if (pt.part === PART_GEM && gemProgress < 0.99 && Math.abs(pt.order - gemProgress) < 0.06) {
+            lum += 0.5;
+            isLeadingEdge = true;
+          }
+
+          const facetTwinkle = pt.part === PART_GEM
+            ? Math.sin(t * 7.5 + pt.seed * 0.37 + totalYaw * 6.0)
+            : Math.sin(t * 4.2 + pt.seed * 0.19);
+
+          const isGlint =
+            isLeadingEdge ||
+            specTotal > 0.62 ||
+            (pt.part === PART_GEM && diffRim > 0.78 && facetTwinkle > 0.86) ||
+            (pt.part !== PART_GEM && specTotal > 0.48 && facetTwinkle > 0.92);
+
+          lum = Math.max(0.08, Math.min(1.0, lum));
+
+          let ch;
+          if (isGlint) {
+            const gIdx = (pt.seed + Math.floor(t * 10)) % GLINT_CHARS.length;
+            ch = GLINT_CHARS[gIdx];
+            glintBuf[cellIdx] = 1;
+            lum = Math.min(1.0, lum + 0.25);
+          } else {
+            const sIdx = Math.min(SHADE_CHARS.length - 1, Math.floor(lum * SHADE_CHARS.length));
+            ch = SHADE_CHARS[sIdx];
+            glintBuf[cellIdx] = 0;
+          }
+
+          charBuf[cellIdx] = ch;
+          lumBuf[cellIdx] = lum;
+        }
+
+        // Stage C: Orbiting 3D Particle Rings
+        const orbitAlpha = Math.max(0, Math.min(1, (t - 7.5) / 2.5));
+        if (orbitAlpha > 0.01) {
+          for (let i = 0; i < ORBIT_TRAILS.length; i++) {
+            const tr = ORBIT_TRAILS[i];
+            const ang = tr.baseAngle + t * tr.speed;
+
+            let x = tr.rx * Math.cos(ang);
+            let y = 0;
+            let z = tr.rz * Math.sin(ang);
+
+            const y1 = y * Math.cos(tr.tiltX) - z * Math.sin(tr.tiltX);
+            const z1 = y * Math.sin(tr.tiltX) + z * Math.cos(tr.tiltX);
+            y = y1; z = z1;
+
+            const x2 = x * Math.cos(tr.tiltZ) - y * Math.sin(tr.tiltZ);
+            const y2 = x * Math.sin(tr.tiltZ) + y * Math.cos(tr.tiltZ) + tr.yOff + MODEL_Y_OFFSET;
+            x = x2; y = y2;
+
+            const yr = y * cosX - z * sinX;
+            const zr = y * sinX + z * cosX;
+
+            const depth = cameraDist - zr;
+            if (depth <= 0.2) continue;
+            const invZ = 1.0 / depth;
+
+            const screenX = centerX + x * projScale * invZ * cameraDist * 0.58;
+            const screenY = centerY - yr * projScale * invZ * cameraDist * 0.58;
+
+            const col = Math.floor(screenX / cellW);
+            const row = Math.floor(screenY / cellH);
+            if (col < 0 || col >= cols || row < 0 || row >= rows) continue;
+
+            const cellIdx = row * cols + col;
+            if (zr <= zBuf[cellIdx]) continue;
+            zBuf[cellIdx] = zr;
+
+            const pulse = 0.5 + 0.5 * Math.sin(t * 4.0 + tr.seed);
+            const lum = (tr.bright ? 0.85 : 0.38 + pulse * 0.25) * orbitAlpha;
+            charBuf[cellIdx] = tr.bright && pulse > 0.7 ? '+' : (lum > 0.55 ? ':' : '.');
+            lumBuf[cellIdx] = lum;
+            glintBuf[cellIdx] = tr.bright && pulse > 0.8 ? 1 : 0;
+          }
+        }
+
+        // Stage D: Ambient Starlight & Background Dust
+        for (let i = 0; i < AMBIENT_STARS.length; i++) {
+          const st = AMBIENT_STARS[i];
+          const col = Math.floor(st.nx * cols);
+          const row = Math.floor(st.ny * rows);
+          if (col < 1 || col >= cols - 1 || row < 1 || row >= rows - 1) continue;
+
+          const cellIdx = row * cols + col;
+          if (zBuf[cellIdx] > -1e8) continue;
+
+          const twinkle = 0.5 + 0.5 * Math.sin(t * st.freq + st.phase);
+          if (twinkle < 0.25) continue;
+
+          charBuf[cellIdx] = st.isCross && twinkle > 0.88 ? '+' : (twinkle > 0.72 ? '·' : '.');
+          lumBuf[cellIdx] = twinkle * (st.isCross ? 0.55 : 0.28);
+          glintBuf[cellIdx] = st.isCross && twinkle > 0.92 ? 1 : 0;
+        }
+
+        // Stage E: Render ASCII Grid to High-DPI Canvas + Starlight Cross Flares
+        ctx.font = `400 ${fontSize}px 'JetBrains Mono', monospace`;
+        ctx.textBaseline = 'top';
+
+        let activeLetters = 0;
+        let activeGlints = 0;
+        const flareSpots = [];
+
+        for (let r = 0; r < rows; r++) {
+          const py = r * cellH;
+          for (let c = 0; c < cols; c++) {
+            const idx = r * cols + c;
+            const ch = charBuf[idx];
+            if (!ch) continue;
+
+            activeLetters++;
+            const lum = lumBuf[idx];
+            const isGlint = glintBuf[idx] === 1;
+
+            if (isGlint) {
+              activeGlints++;
+              ctx.fillStyle = '#ffffff';
+              if (flareSpots.length < 28 && (ch === '*' || ch === '+' || ch === '#') && lum > 0.85) {
+                flareSpots.push({ x: c * cellW + cellW * 0.5, y: py + cellH * 0.5, lum });
+              }
+            } else {
+              const v = Math.floor(38 + lum * 212);
+              ctx.fillStyle = `rgb(${v},${v},${v})`;
+            }
+
+            ctx.fillText(ch, c * cellW, py);
+          }
+        }
+
+        for (let i = 0; i < flareSpots.length; i++) {
+          const fs = flareSpots[i];
+          const arm = 7 + fs.lum * 6;
+          const gradH = ctx.createLinearGradient(fs.x - arm, fs.y, fs.x + arm, fs.y);
+          gradH.addColorStop(0, 'rgba(255,255,255,0)');
+          gradH.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+          gradH.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.strokeStyle = gradH;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(fs.x - arm, fs.y);
+          ctx.lineTo(fs.x + arm, fs.y);
+          ctx.stroke();
+
+          const gradV = ctx.createLinearGradient(fs.x, fs.y - arm, fs.x, fs.y + arm);
+          gradV.addColorStop(0, 'rgba(255,255,255,0)');
+          gradV.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+          gradV.addColorStop(1, 'rgba(255,255,255,0)');
+          ctx.strokeStyle = gradV;
+          ctx.beginPath();
+          ctx.moveTo(fs.x, fs.y - arm);
+          ctx.lineTo(fs.x, fs.y + arm);
+          ctx.stroke();
+        }
+
+        // Stage F: Update Terminal HUD Telemetry
+        const deg = (((totalYaw * 180) / Math.PI) % 360 + 360) % 360;
+        hudTimer.textContent = `${t.toFixed(2).padStart(5, '0')}s`;
+        hudRotation.textContent = `${deg.toFixed(2).padStart(6, '0')}°`;
+        hudGlints.textContent = activeGlints.toLocaleString();
+        hudLetters.textContent = activeLetters.toLocaleString();
+
+        syncCodeHighlight(t);
+      }
+
+      // =========================================================================
+      // 6. MAIN ANIMATION LOOP (30 FPS Authentic Terminal Cadence)
+      // =========================================================================
+      const TARGET_FPS = 30;
+      const FRAME_INTERVAL = 1000 / TARGET_FPS;
+      let accumulator = 0;
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+
+        const dtMs = Math.min(now - lastFrameTime, 100);
+        lastFrameTime = now;
+        if (isPaused) return;
+        accumulator += dtMs;
+
+        if (accumulator >= FRAME_INTERVAL) {
+          const stepSec = accumulator / 1000;
+          accumulator %= FRAME_INTERVAL;
+          simTime += stepSec;
+          renderFrame(simTime);
+        }
+      }
+
+      window.onload = function () {
+        resizeCanvas();
+        renderFrame(0);
+        requestAnimationFrame(animate);
+      };
+    })();
+  </script>
+</body>
+</html>
