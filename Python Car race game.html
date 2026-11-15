@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PYTHON NEON RACER — neon_racer.py</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:ital,wght@0,600;0,800;0,900;1,700;1,900&family=Rajdhani:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #0b0e14;
+      color: #ffffff;
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden;
+    }
+
+    .orbitron {
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    /* Neon text glow matching video */
+    .neon-title {
+      text-shadow:
+        0 0 8px rgba(56, 189, 248, 0.9),
+        0 0 22px rgba(14, 165, 233, 0.75),
+        0 2px 4px rgba(0, 0, 0, 0.95);
+    }
+
+    .neon-banner {
+      text-shadow:
+        0 0 12px rgba(255, 255, 255, 0.95),
+        0 0 28px rgba(56, 189, 248, 0.95),
+        0 0 50px rgba(2, 132, 199, 0.85);
+    }
+
+    .neon-clean {
+      text-shadow:
+        0 0 12px rgba(255, 255, 255, 0.95),
+        0 0 26px rgba(52, 211, 153, 0.95),
+        0 0 46px rgba(16, 185, 129, 0.85);
+    }
+
+    /* VS Code Dark+ Syntax Highlighting */
+    .tok-kw { color: #c586c0; }
+    .tok-var { color: #9cdcfe; }
+    .tok-num { color: #b5cea8; }
+    .tok-fn { color: #dcdcaa; }
+    .tok-prop { color: #9cdcfe; }
+    .tok-const { color: #4fc1ff; }
+    .tok-op { color: #d4d4d4; }
+
+    .vscode-row {
+      display: flex;
+      align-items: center;
+      min-height: 20px;
+      padding: 0 10px 0 4px;
+      transition: background-color 0.08s ease;
+    }
+
+    .vscode-row.active-exec {
+      background-color: rgba(56, 189, 248, 0.14);
+      box-shadow: inset 2px 0 0 #38bdf8;
+    }
+
+    /* Custom thin scrollbar for small screens */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #14171d;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2d333f;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen flex flex-col bg-[#0d1016] overflow-hidden">
+
+  <!-- =========================================================================
+       TOP HALF: 3D-PERSPECTIVE NEON HIGHWAY RACING WINDOW
+  ========================================================================== -->
+  <div id="game-wrapper" class="relative w-full h-[51%] min-h-[250px] bg-[#04070f] overflow-hidden border-b-2 border-[#1e2430] shrink-0">
+    <canvas id="raceCanvas" class="w-full h-full block cursor-pointer"></canvas>
+
+    <!-- Top-Left Title & Subtitle Overlay -->
+    <div class="pointer-events-none absolute top-3 left-3.5 sm:top-4 sm:left-5 z-10">
+      <h1 class="orbitron italic font-black text-base sm:text-2xl md:text-[26px] tracking-wider text-white neon-title leading-none">
+        PYTHON NEON RACER
+      </h1>
+      <div class="orbitron text-[9px] sm:text-[11px] font-semibold tracking-[0.26em] text-sky-200/90 mt-1 pl-1">
+        DODGE <span class="text-sky-400">/</span> BOOST <span class="text-sky-400">/</span> SURVIVE
+      </div>
+    </div>
+
+    <!-- Top-Right Telemetry HUD (SCORE & SPEED) -->
+    <div class="pointer-events-none absolute top-3 right-3.5 sm:top-4 sm:right-5 z-10 text-right orbitron">
+      <div class="text-xs sm:text-base md:text-lg font-extrabold tracking-wider text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+        SCORE: <span id="hud-score" class="text-sky-300 tabular-nums">0</span>
+      </div>
+      <div class="text-xs sm:text-base md:text-lg font-extrabold tracking-wider text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] mt-0.5">
+        SPEED: <span id="hud-speed" class="text-amber-300 tabular-nums">160</span>
+      </div>
+    </div>
+
+    <!-- Dynamic Event Banners ("BOOST x2" & "CLEAN PASS x2" matching video) -->
+    <div id="boost-banner" class="hidden pointer-events-none absolute inset-x-0 top-[23%] flex flex-col items-center justify-center z-20">
+      <div class="orbitron italic font-black text-2xl sm:text-4xl text-white neon-banner tracking-wider animate-pulse">
+        BOOST x2
+      </div>
+    </div>
+
+    <div id="boost-corner-tag" class="hidden pointer-events-none absolute bottom-4 right-4 sm:bottom-6 sm:right-7 z-20">
+      <div class="orbitron italic font-black text-lg sm:text-2xl text-white neon-banner tracking-wider">
+        BOOST x2
+      </div>
+    </div>
+
+    <div id="clean-pass-banner" class="hidden pointer-events-none absolute inset-x-0 top-[25%] flex flex-col items-center justify-center z-20">
+      <div class="orbitron italic font-black text-xl sm:text-3xl text-emerald-100 neon-clean tracking-wider">
+        CLEAN PASS x2
+      </div>
+    </div>
+
+    <!-- Subtle On-Screen Touch / Click Controls for Mobile & Mouse -->
+    <div class="absolute bottom-2.5 left-3 flex items-center gap-2 z-20 opacity-75 hover:opacity-100 transition">
+      <button id="btn-left" aria-label="Move Left"
+        class="w-10 h-9 sm:w-11 sm:h-9 rounded-lg bg-slate-950/70 active:bg-sky-500/50 border border-sky-400/35 text-sky-200 font-bold text-sm flex items-center justify-center backdrop-blur-sm shadow-lg">
+        ◀
+      </button>
+      <button id="btn-right" aria-label="Move Right"
+        class="w-10 h-9 sm:w-11 sm:h-9 rounded-lg bg-slate-950/70 active:bg-sky-500/50 border border-sky-400/35 text-sky-200 font-bold text-sm flex items-center justify-center backdrop-blur-sm shadow-lg">
+        ▶
+      </button>
+      <button id="btn-sfx" title="Toggle Engine Audio"
+        class="px-2.5 h-9 rounded-lg bg-slate-950/70 hover:bg-slate-900 border border-slate-700/70 text-[11px] font-semibold text-slate-300 backdrop-blur-sm">
+        🔊
+      </button>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameover-overlay" class="hidden absolute inset-0 bg-[#03060d]/80 backdrop-blur-sm flex items-center justify-center p-4 z-30">
+      <div class="bg-[#0b1120]/95 border border-sky-400/60 rounded-2xl px-6 py-4 sm:px-8 sm:py-5 text-center shadow-[0_0_40px_rgba(14,165,233,0.3)] max-w-xs w-full">
+        <div class="orbitron text-[10px] font-bold tracking-[0.25em] text-rose-400 uppercase">System Crash</div>
+        <h2 class="orbitron italic font-black text-2xl sm:text-3xl text-white neon-title mt-1 mb-3">GAME OVER</h2>
+        <div class="grid grid-cols-2 gap-2 bg-slate-950/90 border border-slate-800 rounded-xl p-2.5 mb-4 orbitron">
+          <div>
+            <div class="text-[9px] text-slate-400">FINAL SCORE</div>
+            <div id="final-score" class="text-lg font-extrabold text-sky-300 mt-0.5">0</div>
+          </div>
+          <div>
+            <div class="text-[9px] text-slate-400">HIGH SCORE</div>
+            <div id="best-score" class="text-lg font-extrabold text-amber-300 mt-0.5">0</div>
+          </div>
+        </div>
+        <button id="btn-restart"
+          class="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-400 hover:from-sky-400 hover:to-cyan-300 text-slate-950 orbitron font-black text-xs sm:text-sm tracking-wider shadow-lg shadow-sky-500/30 transition active:scale-95">
+          PLAY AGAIN
+        </button>
+        <div class="text-[10px] text-slate-400 mt-2 tracking-wider">Press SPACE or ENTER</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       BOTTOM HALF: DARK VS CODE EDITOR ('neon_racer.py')
+  ========================================================================== -->
+  <div class="flex-1 w-full bg-[#15181e] flex flex-col min-h-0 overflow-hidden">
+    <!-- VS Code Tab Bar -->
+    <div class="h-9 bg-[#101318] flex items-center justify-between border-b border-[#222630] pr-3 shrink-0">
+      <div class="flex items-center h-full">
+        <!-- Active File Tab -->
+        <div class="h-full bg-[#181b22] px-3.5 flex items-center gap-2 border-t-2 border-[#38bdf8] border-r border-[#222630]">
+          <!-- Python Dual-Snake SVG Icon -->
+          <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+            <path d="M11.9 2C7.8 2 8.1 3.8 8.1 3.8V5.7H12V6.3H6.5C6.5 6.3 4 6 4 10.1C4 14.2 6.2 14 6.2 14H7.5V12.1C7.5 12.1 7.4 9.9 9.7 9.9H13.6C13.6 9.9 15.8 9.9 15.8 7.8V4.2C15.8 4.2 16.1 2 11.9 2ZM9.8 3.3C10.2 3.3 10.5 3.6 10.5 4C10.5 4.4 10.2 4.7 9.8 4.7C9.4 4.7 9.1 4.4 9.1 4C9.1 3.6 9.4 3.3 9.8 3.3Z" fill="#38bdf8"/>
+            <path d="M12.1 22C16.2 22 15.9 20.2 15.9 20.2V18.3H12V17.7H17.5C17.5 17.7 20 18 20 13.9C20 9.8 17.8 10 17.8 10H16.5V11.9C16.5 11.9 16.6 14.1 14.3 14.1H10.4C10.4 14.1 8.2 14.1 8.2 16.2V19.8C8.2 19.8 7.9 22 12.1 22ZM14.2 20.7C13.8 20.7 13.5 20.4 13.5 20C13.5 19.6 13.8 19.3 14.2 19.3C14.6 19.3 14.9 19.6 14.9 20C14.9 20.4 14.6 20.7 14.2 20.7Z" fill="#facc15"/>
+          </svg>
+          <span class="mono text-xs text-slate-200 font-medium">neon_racer.py</span>
+        </div>
+      </div>
+
+      <!-- Right Side Controls: Execution Status + Copy Code Button -->
+      <div class="flex items-center gap-2.5">
+        <span id="exec-indicator" class="hidden sm:inline-block mono text-[10px] text-sky-400/90">
+          ● executing line 17
+        </span>
+        <button id="btn-copy-code"
+          class="px-2.5 py-1 rounded bg-[#232834] hover:bg-[#2e3545] border border-[#323949] text-[11px] font-medium text-slate-200 transition flex items-center gap-1.5">
+          <span>📋 Copy Code</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Code Body (Exact 23 lines from video with live blue ▶ playhead) -->
+    <div id="code-editor" class="mono flex-1 overflow-y-auto py-2 text-[11.5px] sm:text-[13px] leading-[1.45] bg-[#181b22]">
+      <!-- Rendered dynamically by JS -->
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. EXACT 23-LINE PYTHON SOURCE CODE FROM VIDEO ('neon_racer.py')
+      // =========================================================================
+      const NEON_RACER_CODE = [
+        'lane = 1',
+        'score = 0',
+        'speed = 6',
+        'boost = False',
+        '',
+        'keys = pygame.key.get_pressed()',
+        '',
+        'if keys[pygame.K_LEFT] and lane > 0:',
+        '    lane -= 1',
+        '',
+        'if keys[pygame.K_RIGHT] and lane < 2:',
+        '    lane += 1',
+        '',
+        'player.x = lanes[lane]',
+        '',
+        'for car in traffic:',
+        '    car.y += speed',
+        '',
+        'if player.colliderect(boost_pad):',
+        '    boost = True',
+        '    speed = 9',
+        '',
+        'score += int(speed)'
+      ];
+
+      function syntaxHighlight(line) {
+        if (!line) return '&nbsp;';
+        let s = line
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        // Numbers
+        s = s.replace(/\b(\d+)\b/g, '<span class="tok-num">$1</span>');
+        // Keywords & Booleans
+        s = s.replace(/\b(if|and|for|in|False|True)\b/g, '<span class="tok-kw">$1</span>');
+        // Pygame constants
+        s = s.replace(/\b(K_LEFT|K_RIGHT)\b/g, '<span class="tok-const">$1</span>');
+        // Functions / Methods
+        s = s.replace(/\b(get_pressed|colliderect|int)\b/g, '<span class="tok-fn">$1</span>');
+        // Variables / Objects
+        s = s.replace(/\b(lane|lanes|score|speed|boost|boost_pad|keys|pygame|key|player|car|traffic)\b/g,
+          '<span class="tok-var">$1</span>');
+        return s;
+      }
+
+      const codeEditorEl = document.getElementById('code-editor');
+      const execIndicatorEl = document.getElementById('exec-indicator');
+      let currentExecLine = 17; // 1-based line number
+
+      function renderCodeEditor(activeLine) {
+        currentExecLine = activeLine;
+        execIndicatorEl.textContent = `● executing line ${activeLine}`;
+
+        codeEditorEl.innerHTML = NEON_RACER_CODE.map((rawLine, idx) => {
+          const lineNum = idx + 1;
+          const isActive = lineNum === activeLine;
+          return `
+            <div id="py-line-${lineNum}" class="vscode-row ${isActive ? 'active-exec' : ''}">
+              <span class="w-4 text-center text-[10px] text-[#38bdf8] shrink-0 select-none">${isActive ? '▶' : ''}</span>
+              <span class="w-6 text-right pr-3 text-[#5c6370] shrink-0 select-none">${lineNum}</span>
+              <span class="whitespace-pre text-[#d4d4d4]">${syntaxHighlight(rawLine)}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      renderCodeEditor(17);
+
+      // Copy Code Button
+      document.getElementById('btn-copy-code').addEventListener('click', () => {
+        const ta = document.createElement('textarea');
+        ta.value = NEON_RACER_CODE.join('\n');
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        const btn = document.getElementById('btn-copy-code');
+        btn.innerHTML = '<span class="text-emerald-400">✓ Copied!</span>';
+        setTimeout(() => {
+          btn.innerHTML = '<span>📋 Copy Code</span>';
+        }, 1500);
+      });
+
+      // =========================================================================
+      // 2. WEB AUDIO ENGINE (Whoosh, Boost Surge, Clean Pass, Crash)
+      // =========================================================================
+      let audioCtx = null;
+      let sfxOn = true;
+
+      function getAudio() {
+        if (!sfxOn) return null;
+        if (!audioCtx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) audioCtx = new AC();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+      }
+
+      function playLaneWhoosh() {
+        const ctx = getAudio();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(240, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(420, ctx.currentTime + 0.09);
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.11);
+      }
+
+      function playBoostSound() {
+        const ctx = getAudio();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(190, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(680, ctx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.09, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.38);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.4);
+      }
+
+      function playCleanPassSound() {
+        const ctx = getAudio();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(660, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.07, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.14);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+      }
+
+      function playCrashSound() {
+        const ctx = getAudio();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(32, ctx.currentTime + 0.42);
+        gain.gain.setValueAtTime(0.16, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.46);
+      }
+
+      document.getElementById('btn-sfx').addEventListener('click', (e) => {
+        sfxOn = !sfxOn;
+        e.currentTarget.textContent = sfxOn ? '🔊' : '🔇';
+        if (sfxOn) getAudio();
+      });
+
+      // =========================================================================
+      // 3. 3D-PERSPECTIVE CYBERPUNK NEON HIGHWAY ENGINE
+      // =========================================================================
+      const canvas = document.getElementById('raceCanvas');
+      const ctx = canvas.getContext('2d');
+
+      const hudScore = document.getElementById('hud-score');
+      const hudSpeed = document.getElementById('hud-speed');
+      const boostBanner = document.getElementById('boost-banner');
+      const boostCornerTag = document.getElementById('boost-corner-tag');
+      const cleanPassBanner = document.getElementById('clean-pass-banner');
+      const gameoverOverlay = document.getElementById('gameover-overlay');
+      const finalScoreEl = document.getElementById('final-score');
+      const bestScoreEl = document.getElementById('best-score');
+
+      let W = 600;
+      let H = 360;
+
+      function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = Math.max(1, rect.width);
+        H = Math.max(1, rect.height);
+        canvas.width = Math.floor(W * dpr);
+        canvas.height = Math.floor(H * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', resizeCanvas);
+
+      // Game State Variables (Mirroring neon_racer.py)
+      let lane = 1;            // 0 = left, 1 = center, 2 = right
+      let visualLane = 1.0;    // Smooth interpolated lane position
+      let carBankAngle = 0;    // Roll tilt when changing lanes
+      let score = 0;
+      let bestScore = 0;
+      let baseSpeed = 160;
+      let displaySpeed = 160;
+      let boostTimer = 0;      // Remaining seconds of BOOST x2
+      let cleanPassTimer = 0;  // Remaining seconds of CLEAN PASS x2 banner
+      let isGameOver = false;
+      let roadPhase = 0;
+      let frameCount = 0;
+      let screenShake = 0;
+      let codeHighlightLockTimer = 0;
+
+      // Entities
+      let traffic = [];        // { lane: 0..2, z: 0..1.1, passed: bool, hue: number }
+      let boostPads = [];      // { lane: 0..2, z: 0..1.1, triggered: bool }
+      let speedStreaks = [];   // Cyberpunk light trails along the buildings & sky
+      let sparks = [];         // Collision / boost particles
+
+      function initSpeedStreaks() {
+        speedStreaks = [];
+        for (let i = 0; i < 34; i++) {
+          const isCyan = i % 3 !== 0;
+          speedStreaks.push({
+            side: i % 2 === 0 ? -1 : 1,
+            spread: 0.22 + Math.random() * 0.78,
+            yNorm: Math.random() * 0.85,
+            len: 25 + Math.random() * 65,
+            speed: 0.6 + Math.random() * 1.4,
+            color: isCyan ? '#38bdf8' : '#fb923c',
+            alpha: 0.35 + Math.random() * 0.55
+          });
+        }
+      }
+
+      function resetGame() {
+        lane = 1;
+        visualLane = 1.0;
+        carBankAngle = 0;
+        score = 0;
+        baseSpeed = 160;
+        displaySpeed = 160;
+        boostTimer = 0;
+        cleanPassTimer = 0;
+        isGameOver = false;
+        screenShake = 0;
+        sparks = [];
+
+        // Initial traffic cars & boost pads spaced cleanly
+        traffic = [
+          { lane: 0, z: 0.18, passed: false },
+          { lane: 2, z: 0.48, passed: false },
+          { lane: 1, z: -0.16, passed: false }
+        ];
+
+        boostPads = [
+          { lane: 1, z: 0.34, triggered: false },
+          { lane: 0, z: -0.28, triggered: false }
+        ];
+
+        initSpeedStreaks();
+        gameoverOverlay.classList.add('hidden');
+        boostBanner.classList.add('hidden');
+        boostCornerTag.classList.add('hidden');
+        cleanPassBanner.classList.add('hidden');
+        highlightCodeLine(1, 0.25);
+      }
+
+      function highlightCodeLine(lineNum, holdSec = 0.28) {
+        renderCodeEditor(lineNum);
+        codeHighlightLockTimer = holdSec;
+        const rowEl = document.getElementById(`py-line-${lineNum}`);
+        if (rowEl) {
+          rowEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      }
+
+      // =========================================================================
+      // 4. CONTROLS (Keyboard, Touch Buttons, Canvas Lane Tap/Swipe)
+      // =========================================================================
+      function moveLeft() {
+        if (isGameOver) return;
+        getAudio();
+        if (lane > 0) {
+          lane -= 1;
+          playLaneWhoosh();
+          highlightCodeLine(9, 0.35);
+        } else {
+          highlightCodeLine(8, 0.22);
+        }
+      }
+
+      function moveRight() {
+        if (isGameOver) return;
+        getAudio();
+        if (lane < 2) {
+          lane += 1;
+          playLaneWhoosh();
+          highlightCodeLine(12, 0.35);
+        } else {
+          highlightCodeLine(11, 0.22);
+        }
+      }
+
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          e.preventDefault();
+          moveLeft();
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          e.preventDefault();
+          moveRight();
+        } else if ((e.code === 'Space' || e.key === 'Enter') && isGameOver) {
+          e.preventDefault();
+          resetGame();
+        }
+      });
+
+      document.getElementById('btn-left').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        moveLeft();
+      });
+      document.getElementById('btn-right').addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        moveRight();
+      });
+      document.getElementById('btn-restart').addEventListener('click', () => {
+        getAudio();
+        resetGame();
+      });
+
+      // Swipe or Tap directly on the 3-lane highway canvas
+      let touchStartX = null;
+      canvas.addEventListener('pointerdown', (e) => {
+        if (isGameOver) return;
+        touchStartX = e.clientX;
+      });
+      canvas.addEventListener('pointerup', (e) => {
+        if (touchStartX === null || isGameOver) return;
+        const dx = e.clientX - touchStartX;
+        touchStartX = null;
+        if (Math.abs(dx) > 22) {
+          if (dx < 0) moveLeft();
+          else moveRight();
+        } else {
+          // Tap left/center/right third of road to switch toward that lane
+          const rect = canvas.getBoundingClientRect();
+          const relX = (e.clientX - rect.left) / rect.width;
+          if (relX < 0.38) moveLeft();
+          else if (relX > 0.62) moveRight();
+        }
+      });
+
+      // =========================================================================
+      // 5. 3D PERSPECTIVE PROJECTION & CYBERPUNK RENDERER
+      // =========================================================================
+      function getHorizonY() {
+        return H * 0.22;
+      }
+
+      // Projects normalized depth z in [0..1] (0 = horizon, 1 = bottom) to screen Y & road half-width
+      function projectZ(z) {
+        const horizonY = getHorizonY();
+        const clampedZ = Math.max(0, z);
+        const persp = Math.pow(clampedZ, 1.32);
+        const y = horizonY + persp * (H - horizonY);
+        const topHalfW = W * 0.055;
+        const botHalfW = W * 0.34;
+        const halfW = topHalfW + (botHalfW - topHalfW) * persp;
+        return { y, halfW, persp };
+      }
+
+      // Returns screen X for a lane index (0, 1, 2) at depth z
+      function getLaneScreenX(lanePos, halfW) {
+        const laneOffset = (lanePos - 1) * 0.64; // -0.64, 0, +0.64
+        return W * 0.5 + laneOffset * halfW;
+      }
+
+      function drawCyberpunkBackdrop() {
+        const horizonY = getHorizonY();
+        const cx = W * 0.5;
+
+        // 1. Deep Midnight Cyberpunk Sky
+        const skyGrad = ctx.createLinearGradient(0, 0, 0, horizonY + 12);
+        skyGrad.addColorStop(0, '#02040a');
+        skyGrad.addColorStop(0.65, '#071226');
+        skyGrad.addColorStop(1, '#0e365c');
+        ctx.fillStyle = skyGrad;
+        ctx.fillRect(0, 0, W, H);
+
+        // 2. Glowing Cyan Vanishing Point Horizon Bloom
+        const bloom = ctx.createRadialGradient(cx, horizonY, 2, cx, horizonY, W * 0.38);
+        bloom.addColorStop(0, 'rgba(186, 230, 253, 0.95)');
+        bloom.addColorStop(0.22, 'rgba(56, 189, 248, 0.52)');
+        bloom.addColorStop(0.6, 'rgba(14, 116, 144, 0.16)');
+        bloom.addColorStop(1, 'rgba(2, 6, 23, 0)');
+        ctx.fillStyle = bloom;
+        ctx.fillRect(0, 0, W, H * 0.75);
+
+        // 3. Futuristic Skyscrapers Flanking Both Sides of the Highway
+        const buildings = [
+          // Left side skyscrapers (outer to inner)
+          { x0: 0.00, w: 0.09, topY: 0.00, botY: 0.95, neon: '#38bdf8', warm: false },
+          { x0: 0.07, w: 0.08, topY: 0.04, botY: 0.82, neon: '#fb923c', warm: true },
+          { x0: 0.14, w: 0.08, topY: 0.09, botY: 0.68, neon: '#38bdf8', warm: false },
+          { x0: 0.21, w: 0.07, topY: 0.13, botY: 0.54, neon: '#f97316', warm: true },
+          { x0: 0.27, w: 0.06, topY: 0.16, botY: 0.42, neon: '#38bdf8', warm: false },
+          { x0: 0.33, w: 0.05, topY: 0.18, botY: 0.33, neon: '#38bdf8', warm: false },
+          // Right side skyscrapers (outer to inner)
+          { x0: 0.91, w: 0.09, topY: 0.00, botY: 0.95, neon: '#fb923c', warm: true },
+          { x0: 0.85, w: 0.08, topY: 0.04, botY: 0.82, neon: '#38bdf8', warm: false },
+          { x0: 0.78, w: 0.08, topY: 0.09, botY: 0.68, neon: '#f97316', warm: true },
+          { x0: 0.72, w: 0.07, topY: 0.13, botY: 0.54, neon: '#38bdf8', warm: false },
+          { x0: 0.67, w: 0.06, topY: 0.16, botY: 0.42, neon: '#fb923c', warm: true },
+          { x0: 0.62, w: 0.05, topY: 0.18, botY: 0.33, neon: '#38bdf8', warm: false }
+        ];
+
+        buildings.forEach((b, idx) => {
+          const bx = b.x0 * W;
+          const bw = b.w * W;
+          const by = b.topY * H;
+          const bh = (b.botY - b.topY) * H;
+
+          // Dark metallic tower silhouette
+          const bGrad = ctx.createLinearGradient(bx, by, bx + bw, by + bh);
+          bGrad.addColorStop(0, '#070b14');
+          bGrad.addColorStop(1, '#0e1624');
+          ctx.fillStyle = bGrad;
+          ctx.fillRect(bx, by, bw, bh);
+
+          // Glowing vertical architectural neon strip
+          ctx.save();
+          ctx.fillStyle = b.neon;
+          ctx.shadowColor = b.neon;
+          ctx.shadowBlur = 10;
+          const stripX = idx < 6 ? bx + bw - 3 : bx + 1.5;
+          ctx.fillRect(stripX, by + 6, 2, bh - 12);
+
+          // Tiny glowing window grid dots
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = b.warm ? 'rgba(251, 146, 60, 0.38)' : 'rgba(56, 189, 248, 0.32)';
+          for (let wy = by + 12; wy < by + bh - 14; wy += 11) {
+            for (let wx = bx + 5; wx < bx + bw - 6; wx += 7) {
+              if (((wx + wy + idx) % 3) === 0) {
+                ctx.fillRect(wx, wy, 3, 4);
+              }
+            }
+          }
+          ctx.restore();
+        });
+
+        // 4. High-Speed Diagonal Cyberpunk Light Streaks (Intensifies during BOOST x2!)
+        const isBoosting = boostTimer > 0;
+        for (let i = 0; i < speedStreaks.length; i++) {
+          const st = speedStreaks[i];
+          const progress = (st.yNorm + roadPhase * st.speed * (isBoosting ? 1.8 : 0.7)) % 1.0;
+          const distFromCenter = (0.08 + progress * 0.46) * W * st.spread;
+          const x1 = cx + st.side * distFromCenter;
+          const y1 = horizonY * 0.45 + progress * (H * 0.68);
+          const angle = Math.atan2(y1 - horizonY, x1 - cx);
+          const streakLen = st.len * (0.3 + progress) * (isBoosting ? 1.85 : 1.0);
+
+          ctx.save();
+          ctx.strokeStyle = st.color;
+          ctx.globalAlpha = st.alpha * (isBoosting ? 0.95 : 0.55);
+          ctx.lineWidth = isBoosting ? 2.4 : 1.4;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x1 + Math.cos(angle) * streakLen, y1 + Math.sin(angle) * streakLen);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      function drawHighway() {
+        const top = projectZ(0);
+        const bot = projectZ(1);
+        const cx = W * 0.5;
+
+        // 1. Dark Glossy Asphalt Roadbed
+        const roadGrad = ctx.createLinearGradient(0, top.y, 0, bot.y);
+        roadGrad.addColorStop(0, '#091426');
+        roadGrad.addColorStop(0.35, '#121824');
+        roadGrad.addColorStop(1, '#181e29');
+        ctx.fillStyle = roadGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx - top.halfW, top.y);
+        ctx.lineTo(cx + top.halfW, top.y);
+        ctx.lineTo(cx + bot.halfW, bot.y);
+        ctx.lineTo(cx - bot.halfW, bot.y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Subtle cyan reflection sheen down the center of wet asphalt
+        const sheenGrad = ctx.createLinearGradient(0, top.y, 0, bot.y);
+        sheenGrad.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
+        sheenGrad.addColorStop(0.5, 'rgba(56, 189, 248, 0.06)');
+        sheenGrad.addColorStop(1, 'rgba(56, 189, 248, 0.02)');
+        ctx.fillStyle = sheenGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx - top.halfW * 0.6, top.y);
+        ctx.lineTo(cx + top.halfW * 0.6, top.y);
+        ctx.lineTo(cx + bot.halfW * 0.55, bot.y);
+        ctx.lineTo(cx - bot.halfW * 0.55, bot.y);
+        ctx.closePath();
+        ctx.fill();
+
+        // 2. Glowing Electric-Cyan Outer Guardrails (Left & Right Edges)
+        ctx.save();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.shadowColor = '#0ea5e9';
+        ctx.shadowBlur = 14;
+        ctx.lineWidth = 3;
+
+        // Left rail
+        ctx.beginPath();
+        ctx.moveTo(cx - top.halfW, top.y);
+        ctx.lineTo(cx - bot.halfW, bot.y);
+        ctx.stroke();
+
+        // Right rail
+        ctx.beginPath();
+        ctx.moveTo(cx + top.halfW, top.y);
+        ctx.lineTo(cx + bot.halfW, bot.y);
+        ctx.stroke();
+        ctx.restore();
+
+        // 3. Two Dashed Lane Divider Lines (Separating the 3 Lanes: 0 | 1 | 2)
+        const numDashes = 10;
+        const laneDividers = [-0.33, 0.33];
+
+        for (let d = 0; d < numDashes; d++) {
+          const z0 = ((d + roadPhase) % numDashes) / numDashes;
+          const z1 = Math.min(1, z0 + 0.055);
+          if (z1 <= z0) continue;
+
+          const p0 = projectZ(z0);
+          const p1 = projectZ(z1);
+
+          ctx.fillStyle = `rgba(226, 232, 240, ${0.35 + p0.persp * 0.55})`;
+          laneDividers.forEach((divRatio) => {
+            const x0 = cx + divRatio * p0.halfW;
+            const x1 = cx + divRatio * p1.halfW;
+            const w0 = Math.max(0.8, p0.halfW * 0.015);
+            const w1 = Math.max(1.5, p1.halfW * 0.018);
+
+            ctx.beginPath();
+            ctx.moveTo(x0 - w0, p0.y);
+            ctx.lineTo(x0 + w0, p0.y);
+            ctx.lineTo(x1 + w1, p1.y);
+            ctx.lineTo(x1 - w1, p1.y);
+            ctx.closePath();
+            ctx.fill();
+          });
+        }
+      }
+
+      // Draw Golden-Yellow Glowing Chevron Boost Pad (`>>>`) on the road
+      function drawBoostPad(pad) {
+        if (pad.z < 0.02 || pad.z > 1.05) return;
+        const p = projectZ(pad.z);
+        const cx = getLaneScreenX(pad.lane, p.halfW);
+        const cy = p.y;
+        const sc = 0.25 + p.persp * 1.15;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(sc, sc * 0.62);
+
+        // Warm golden ground glow
+        const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, 34);
+        glow.addColorStop(0, 'rgba(250, 204, 21, 0.65)');
+        glow.addColorStop(1, 'rgba(250, 204, 21, 0)');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, 34, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3 Stacked Glowing Yellow Chevrons pointing forward
+        ctx.strokeStyle = '#fef08a';
+        ctx.shadowColor = '#facc15';
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 4.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const pulse = Math.sin(frameCount * 0.25) * 2;
+        [-12, 0, 12].forEach((offsetY) => {
+          ctx.beginPath();
+          ctx.moveTo(-16, offsetY + 8 - pulse);
+          ctx.lineTo(0, offsetY - 6 - pulse);
+          ctx.lineTo(16, offsetY + 8 - pulse);
+          ctx.stroke();
+        });
+
+        ctx.restore();
+      }
+
+      // Draw Glossy Crimson/Orange Traffic Sports Car (Rear 3/4 Perspective)
+      function drawTrafficCar(car) {
+        if (car.z < 0.02 || car.z > 1.08) return;
+        const p = projectZ(car.z);
+        const cx = getLaneScreenX(car.lane, p.halfW);
+        const cy = p.y;
+        const sc = (0.24 + p.persp * 1.08) * (Math.min(W, H) / 340);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(sc, sc);
+
+        // Warm Orange/Red Neon Underglow
+        const underglow = ctx.createRadialGradient(0, 4, 4, 0, 4, 46);
+        underglow.addColorStop(0, 'rgba(249, 115, 22, 0.72)');
+        underglow.addColorStop(0.6, 'rgba(239, 68, 68, 0.28)');
+        underglow.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        ctx.fillStyle = underglow;
+        ctx.beginPath();
+        ctx.ellipse(0, 5, 44, 15, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dark Tires
+        ctx.fillStyle = '#090b10';
+        ctx.beginPath();
+        ctx.roundRect(-30, -14, 10, 18, 3);
+        ctx.roundRect(20, -14, 10, 18, 3);
+        ctx.fill();
+
+        // Glossy Crimson-Orange Chassis
+        const bodyGrad = ctx.createLinearGradient(0, -36, 0, 2);
+        bodyGrad.addColorStop(0, '#fb923c');
+        bodyGrad.addColorStop(0.45, '#ea580c');
+        bodyGrad.addColorStop(1, '#9a3412');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(-29, 0);
+        ctx.lineTo(-26, -21);
+        ctx.lineTo(-17, -34);
+        ctx.lineTo(17, -34);
+        ctx.lineTo(26, -21);
+        ctx.lineTo(29, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        // Tinted Rear Windshield & Roofline
+        ctx.fillStyle = '#111622';
+        ctx.beginPath();
+        ctx.moveTo(-19, -20);
+        ctx.lineTo(-14, -31);
+        ctx.lineTo(14, -31);
+        ctx.lineTo(19, -20);
+        ctx.closePath();
+        ctx.fill();
+
+        // Rear Spoiler Wing
+        ctx.fillStyle = '#7c2d12';
+        ctx.beginPath();
+        ctx.roundRect(-27, -23, 54, 4, 2);
+        ctx.fill();
+
+        // Glowing Red LED Tail Lights
+        ctx.fillStyle = '#ff2a2a';
+        ctx.shadowColor = '#ef4444';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.roundRect(-25, -13, 14, 4.5, 2);
+        ctx.roundRect(11, -13, 14, 4.5, 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Rear Diffuser
+        ctx.fillStyle = '#18181b';
+        ctx.fillRect(-16, -5, 32, 5);
+
+        ctx.restore();
+      }
+
+      // Draw Player's Sleek Metallic Electric-Blue Supercar with Dual Blue Nitro Flames
+      function drawPlayerCar() {
+        const p = projectZ(0.84);
+        const cx = getLaneScreenX(visualLane, p.halfW);
+        const cy = p.y;
+        const sc = (Math.min(W, H) / 310);
+        const isBoosting = boostTimer > 0;
+        const hoverBob = Math.sin(frameCount * 0.35) * 1.1;
+
+        ctx.save();
+        ctx.translate(cx, cy + hoverBob);
+        ctx.scale(sc, sc);
+        ctx.rotate(carBankAngle);
+
+        // 1. Intense Electric-Cyan Underglow
+        const glowRadius = isBoosting ? 64 : 50;
+        const underglow = ctx.createRadialGradient(0, 6, 4, 0, 6, glowRadius);
+        underglow.addColorStop(0, isBoosting ? 'rgba(125, 211, 252, 0.95)' : 'rgba(56, 189, 248, 0.8)');
+        underglow.addColorStop(0.55, 'rgba(2, 132, 199, 0.35)');
+        underglow.addColorStop(1, 'rgba(2, 132, 199, 0)');
+        ctx.fillStyle = underglow;
+        ctx.beginPath();
+        ctx.ellipse(0, 7, glowRadius, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Wide Rear Racing Tires
+        ctx.fillStyle = '#080a0f';
+        ctx.beginPath();
+        ctx.roundRect(-33, -15, 11, 20, 3);
+        ctx.roundRect(22, -15, 11, 20, 3);
+        ctx.fill();
+
+        // 3. Sculpted Metallic Cobalt/Electric-Blue Supercar Body
+        const bodyGrad = ctx.createLinearGradient(-30, -38, 30, 2);
+        bodyGrad.addColorStop(0, '#38bdf8');
+        bodyGrad.addColorStop(0.45, '#0284c7');
+        bodyGrad.addColorStop(1, '#1e3a8a');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(-32, 1);
+        ctx.lineTo(-29, -22);
+        ctx.lineTo(-18, -37);
+        ctx.lineTo(18, -37);
+        ctx.lineTo(29, -22);
+        ctx.lineTo(32, 1);
+        ctx.closePath();
+        ctx.fill();
+
+        // Specular Cyan Rim Highlights on Rear Fenders
+        ctx.strokeStyle = '#7dd3fc';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(-28, -21);
+        ctx.lineTo(-17, -36);
+        ctx.lineTo(17, -36);
+        ctx.lineTo(28, -21);
+        ctx.stroke();
+
+        // 4. Dark Glass Cabin & Louvered Rear Engine Deck
+        ctx.fillStyle = '#0b111e';
+        ctx.beginPath();
+        ctx.moveTo(-20, -21);
+        ctx.lineTo(-14, -34);
+        ctx.lineTo(14, -34);
+        ctx.lineTo(20, -21);
+        ctx.closePath();
+        ctx.fill();
+
+        // 5. Carbon-Fiber GT Rear Wing
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.roundRect(-31, -25, 62, 4.5, 2);
+        ctx.fill();
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(-31, -25, 4, 4.5);
+        ctx.fillRect(27, -25, 4, 4.5);
+
+        // 6. Sleek Crimson LED Tail Light Bar
+        ctx.fillStyle = '#ff2a2a';
+        ctx.shadowColor = '#ff2a2a';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.roundRect(-27, -14, 16, 4.2, 2);
+        ctx.roundRect(11, -14, 16, 4.2, 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 7. Rear Carbon Diffuser
+        ctx.fillStyle = '#090d16';
+        ctx.fillRect(-18, -6, 36, 7);
+
+        // 8. Dual Cyan-Blue Nitro Exhaust Flames (Exact signature look from video)
+        const flameFlicker = Math.sin(frameCount * 0.85) * 4 + (isBoosting ? 14 : 0);
+        const flameW = isBoosting ? 9 : 6.5;
+        const flameLen = (isBoosting ? 26 : 15) + flameFlicker;
+
+        [-11, 11].forEach((exX) => {
+          // Outer blue plasma cone
+          const fGrad = ctx.createLinearGradient(exX, -2, exX, flameLen);
+          fGrad.addColorStop(0, '#ffffff');
+          fGrad.addColorStop(0.35, '#38bdf8');
+          fGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
+
+          ctx.fillStyle = fGrad;
+          ctx.beginPath();
+          ctx.moveTo(exX - flameW, -2);
+          ctx.lineTo(exX + flameW, -2);
+          ctx.lineTo(exX, flameLen);
+          ctx.closePath();
+          ctx.fill();
+        });
+
+        ctx.restore();
+      }
+
+      function spawnSparks(x, y, color, count = 24) {
+        for (let i = 0; i < count; i++) {
+          const ang = Math.random() * Math.PI * 2;
+          const spd = 2 + Math.random() * 6;
+          sparks.push({
+            x,
+            y,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd - 1.5,
+            life: 1.0,
+            color: i % 2 === 0 ? color : '#ffffff',
+            size: 2.5 + Math.random() * 3.5
+          });
+        }
+      }
+
+      function updateAndDrawSparks() {
+        for (let i = sparks.length - 1; i >= 0; i--) {
+          const s = sparks[i];
+          s.x += s.vx;
+          s.y += s.vy;
+          s.vy += 0.15;
+          s.life -= 0.032;
+          if (s.life <= 0) {
+            sparks.splice(i, 1);
+            continue;
+          }
+          ctx.save();
+          ctx.globalAlpha = s.life;
+          ctx.fillStyle = s.color;
+          ctx.shadowColor = s.color;
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.size * s.life, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      // =========================================================================
+      // 6. MAIN SIMULATION LOOP & VS CODE LINE EXECUTION SYNC
+      // =========================================================================
+      function update(dt) {
+        if (isGameOver) return;
+
+        frameCount++;
+
+        // Smooth lane interpolation (`player.x = lanes[lane]`)
+        const prevVisual = visualLane;
+        visualLane += (lane - visualLane) * Math.min(1, dt * 16);
+        carBankAngle = (visualLane - prevVisual) * 1.45;
+
+        // Manage Boost Timer & Speed (`speed = 9` during boost -> 250-260 HUD readout)
+        if (boostTimer > 0) {
+          boostTimer -= dt;
+          const targetBoostSpeed = 250 + Math.floor(Math.sin(frameCount * 0.25) * 10);
+          displaySpeed += (targetBoostSpeed - displaySpeed) * 0.18;
+          boostBanner.classList.remove('hidden');
+          boostCornerTag.classList.remove('hidden');
+        } else {
+          boostBanner.classList.add('hidden');
+          boostCornerTag.classList.add('hidden');
+          baseSpeed = Math.min(205, baseSpeed + dt * 1.4);
+          displaySpeed += (baseSpeed - displaySpeed) * 0.12;
+        }
+
+        if (cleanPassTimer > 0) {
+          cleanPassTimer -= dt;
+          cleanPassBanner.classList.remove('hidden');
+        } else {
+          cleanPassBanner.classList.add('hidden');
+        }
+
+        // Highway velocity factor
+        const velFactor = (boostTimer > 0 ? 1.52 : 0.92) * (displaySpeed / 160);
+        roadPhase = (roadPhase + dt * 8.5 * velFactor) % 10;
+
+        // Update Boost Pads (`if player.colliderect(boost_pad):`)
+        for (let i = 0; i < boostPads.length; i++) {
+          const pad = boostPads[i];
+          pad.z += dt * 0.62 * velFactor;
+
+          // Check collision with player car at z ~ [0.78..0.90]
+          if (!pad.triggered && pad.z > 0.77 && pad.z < 0.90 && pad.lane === lane) {
+            pad.triggered = true;
+            boostTimer = 2.6;
+            score += 250;
+            playBoostSound();
+            highlightCodeLine(20, 0.55); // `boost = True` / `speed = 9`
+
+            const p = projectZ(0.84);
+            spawnSparks(getLaneScreenX(visualLane, p.halfW), p.y, '#38bdf8', 18);
+          }
+
+          if (pad.z > 1.12) {
+            pad.z = -0.35 - Math.random() * 0.35;
+            pad.lane = Math.floor(Math.random() * 3);
+            pad.triggered = false;
+          }
+        }
+
+        // Update Traffic Cars (`for car in traffic: car.y += speed`)
+        for (let i = 0; i < traffic.length; i++) {
+          const car = traffic[i];
+          car.z += dt * 0.54 * velFactor;
+
+          // Check collision with player car
+          if (car.z > 0.77 && car.z < 0.89 && Math.abs(car.lane - visualLane) < 0.44) {
+            triggerCrash();
+            return;
+          }
+
+          // Clean Pass bonus when passing close to a traffic car in an adjacent lane
+          if (!car.passed && car.z >= 0.89) {
+            car.passed = true;
+            if (Math.abs(car.lane - lane) === 1) {
+              cleanPassTimer = 1.25;
+              score += boostTimer > 0 ? 200 : 100;
+              playCleanPassSound();
+              highlightCodeLine(23, 0.35); // `score += int(speed)`
+            }
+          }
+
+          // Respawn traffic car at horizon ensuring at least 1 lane is always passable
+          if (car.z > 1.12) {
+            car.z = -0.15 - Math.random() * 0.25;
+            car.passed = false;
+            const otherLanes = traffic.filter((_, idx) => idx !== i && traffic[idx].z < 0.25).map(c => c.lane);
+            let nextLane = Math.floor(Math.random() * 3);
+            if (otherLanes.length >= 2 && otherLanes.includes(nextLane)) {
+              nextLane = [0, 1, 2].find(l => !otherLanes.includes(l)) ?? nextLane;
+            }
+            car.lane = nextLane;
+          }
+        }
+
+        // Increment Score (`score += int(speed)`)
+        score += Math.floor(dt * displaySpeed * (boostTimer > 0 ? 1.8 : 0.75));
+        hudScore.textContent = score.toLocaleString();
+        hudSpeed.textContent = String(Math.round(displaySpeed));
+
+        // Cycle active execution line in VS Code when not locked by a recent event
+        if (codeHighlightLockTimer > 0) {
+          codeHighlightLockTimer -= dt;
+        } else if (frameCount % 16 === 0) {
+          const loopLines = boostTimer > 0 ? [20, 21, 23] : [14, 16, 17, 23];
+          const pick = loopLines[Math.floor(frameCount / 16) % loopLines.length];
+          renderCodeEditor(pick);
+        }
+      }
+
+      function triggerCrash() {
+        isGameOver = true;
+        screenShake = 16;
+        playCrashSound();
+
+        if (score > bestScore) bestScore = score;
+        finalScoreEl.textContent = score.toLocaleString();
+        bestScoreEl.textContent = bestScore.toLocaleString();
+
+        const p = projectZ(0.84);
+        const cx = getLaneScreenX(visualLane, p.halfW);
+        spawnSparks(cx, p.y - 14, '#fb923c', 36);
+
+        boostBanner.classList.add('hidden');
+        boostCornerTag.classList.add('hidden');
+        cleanPassBanner.classList.add('hidden');
+        gameoverOverlay.classList.remove('hidden');
+      }
+
+      function render() {
+        ctx.save();
+        if (screenShake > 0) {
+          screenShake--;
+          ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+        }
+
+        drawCyberpunkBackdrop();
+        drawHighway();
+
+        // Draw boost pads flat on the road surface
+        for (let i = 0; i < boostPads.length; i++) {
+          drawBoostPad(boostPads[i]);
+        }
+
+        // Sort traffic back-to-front so closer cars overlap farther cars cleanly
+        const sortedTraffic = [...traffic].sort((a, b) => a.z - b.z);
+        for (let i = 0; i < sortedTraffic.length; i++) {
+          drawTrafficCar(sortedTraffic[i]);
+        }
+
+        drawPlayerCar();
+        updateAndDrawSparks();
+
+        ctx.restore();
+      }
+
+      let lastTs = performance.now();
+      function loop(now) {
+        requestAnimationFrame(loop);
+        const dt = Math.min((now - lastTs) / 1000, 0.05);
+        lastTs = now;
+
+        update(dt);
+        render();
+      }
+
+      window.onload = function () {
+        resizeCanvas();
+        resetGame();
+        requestAnimationFrame(loop);
+      };
+    })();
+  </script>
+</body>
+</html>
