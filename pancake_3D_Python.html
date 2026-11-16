@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Pancake Sort - Python Visualization</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      background-color: #161b19;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* Centered 9:16 Portrait Stage matching the video frame */
+    #stage-frame {
+      position: relative;
+      width: min(100vw, 56.25vh);
+      height: 100vh;
+      max-height: 100dvh;
+      overflow: hidden;
+      background-color: #9ec0b2;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65);
+    }
+    @media (max-width: 640px) {
+      #stage-frame {
+        width: 100vw;
+        height: 100dvh;
+      }
+    }
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    .title-shadow {
+      text-shadow: 0 3px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.6);
+    }
+    .code-card {
+      background: rgba(36, 22, 14, 0.89);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 225, 190, 0.16);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .code-line {
+      position: relative;
+      padding: 1.5px 10px;
+      border-radius: 5px;
+      transition: background-color 0.18s ease;
+      white-space: pre;
+    }
+    .code-line.active {
+      background: rgba(255, 200, 110, 0.22);
+      box-shadow: inset 3px 0 0 #fbbf24;
+    }
+    .code-line.active-flip {
+      background: rgba(245, 158, 11, 0.30);
+      box-shadow: inset 3px 0 0 #f59e0b;
+    }
+    .glass-pill {
+      background: rgba(24, 20, 18, 0.65);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      transition: all 0.18s ease;
+    }
+    .glass-pill:hover {
+      background: rgba(42, 34, 29, 0.85);
+      transform: translateY(-1px);
+    }
+    .glass-pill:active {
+      transform: scale(0.96);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 9:16 Portrait Stage Container -->
+  <div id="stage-frame">
+    <!-- 3D Kitchen Canvas -->
+    <div id="canvas-container"></div>
+
+    <!-- Header Overlay (Exact Match to Video) -->
+    <header class="absolute top-0 left-0 right-0 z-10 pointer-events-none flex flex-col items-center pt-7 sm:pt-9 px-4">
+      <h1 class="text-white font-extrabold text-[32px] sm:text-[38px] leading-tight tracking-tight title-shadow">
+        Pancake Sort
+      </h1>
+      <p class="text-white/95 font-bold text-[17px] sm:text-[20px] mt-0.5 tracking-wide title-shadow">
+        Python
+      </p>
+    </header>
+
+    <!-- Discreet Top Controls (Inside Stage Top Corners) -->
+    <div class="absolute top-2.5 left-2.5 right-2.5 z-20 flex items-center justify-between pointer-events-none">
+      <button id="btn-sound" title="Toggle Sound" class="pointer-events-auto glass-pill text-white/90 text-[11px] font-semibold px-2.5 py-1 rounded-full cursor-pointer">
+        <span id="sound-icon">🔇</span>
+      </button>
+      <div class="pointer-events-auto flex items-center gap-1">
+        <button id="btn-playpause" class="glass-pill text-white text-[11px] font-semibold px-2.5 py-1 rounded-full cursor-pointer">
+          Pause
+        </button>
+        <button id="btn-speed" class="glass-pill text-amber-300 text-[11px] font-semibold px-2 py-1 rounded-full cursor-pointer">
+          1x
+        </button>
+        <button id="btn-replay" class="glass-pill text-white text-[11px] font-semibold px-2.5 py-1 rounded-full cursor-pointer">
+          Replay
+        </button>
+      </div>
+    </div>
+
+    <!-- Live Python Code Card Overlay (Strictly BELOW Plate & Pancakes - Zero Overlap) -->
+    <div class="absolute bottom-7 sm:bottom-9 left-0 right-0 z-10 flex flex-col items-center px-3.5 pointer-events-none">
+      <div class="code-card pointer-events-auto w-full max-w-[360px] rounded-2xl px-3.5 py-3 text-[12px] sm:text-[13px] leading-[1.48] text-[#f5efe6]">
+        <div id="code-lines" class="space-y-0.5">
+          <div class="code-line" data-line="0"><span class="text-[#ff9e64]">def</span> <span class="text-[#7aa2f7]">flip</span>(v, k):</div>
+          <div class="code-line" data-line="1">    v[:k] = v[:k][::<span class="text-[#ff9e64]">-1</span>]</div>
+          <div class="code-line" data-line="2" id="line-array">v = [<span class="text-[#e0af68]">3, 6, 2, 4, 7, 1, 5</span>]</div>
+          <div class="code-line" data-line="3"><span class="text-[#bb9af7]">for</span> n <span class="text-[#bb9af7]">in</span> <span class="text-[#7dcfff]">range</span>(<span class="text-[#7dcfff]">len</span>(v), <span class="text-[#ff9e64]">1</span>, <span class="text-[#ff9e64]">-1</span>):</div>
+          <div class="code-line" data-line="4">    m = v.index(<span class="text-[#7dcfff]">max</span>(v[:n]))</div>
+          <div class="code-line" data-line="5">    <span class="text-[#bb9af7]">if</span> m != n - <span class="text-[#ff9e64]">1</span>:</div>
+          <div class="code-line" data-line="6">        flip(v, m + <span class="text-[#ff9e64]">1</span>)</div>
+          <div class="code-line" data-line="7">        flip(v, n)</div>
+          <div class="code-line" data-line="8"><span class="text-[#7dcfff]">print</span>(v)</div>
+        </div>
+
+        <!-- Print Output Reveal -->
+        <div id="output-box" class="mt-1.5 pt-1 text-[#9ece6a] font-bold tracking-wide transition-all duration-300 opacity-0 h-0 overflow-hidden">
+          [1, 2, 3, 4, 5, 6, 7]
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * =========================================================================
+     * 1. SOUND SYNTHESIZER (Web Audio via Tone.js - Soft Kitchen & Flip SFX)
+     * =========================================================================
+     */
+    let soundEnabled = false;
+    let synth = null;
+    let noiseSynth = null;
+
+    function initAudio() {
+      if (synth) return;
+      synth = new Tone.PolySynth(Tone.Synth, {
+        oscillator: { type: 'triangle' },
+        envelope: { attack: 0.01, decay: 0.18, sustain: 0.05, release: 0.3 }
+      }).toDestination();
+      synth.volume.value = -12;
+
+      noiseSynth = new Tone.NoiseSynth({
+        noise: { type: 'pink' },
+        envelope: { attack: 0.02, decay: 0.14, sustain: 0, release: 0.1 }
+      }).toDestination();
+      noiseSynth.volume.value = -18;
+    }
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      try {
+        initAudio();
+        if (Tone.context.state !== 'running') Tone.start();
+        if (type === 'scan') {
+          synth.triggerAttackRelease('E5', '32n');
+        } else if (type === 'slide') {
+          noiseSynth.triggerAttackRelease('16n');
+        } else if (type === 'flip') {
+          synth.triggerAttackRelease(['C4', 'G4'], '16n');
+        } else if (type === 'land') {
+          synth.triggerAttackRelease('G3', '16n');
+        } else if (type === 'win') {
+          const now = Tone.now();
+          synth.triggerAttackRelease('C5', '16n', now);
+          synth.triggerAttackRelease('E5', '16n', now + 0.09);
+          synth.triggerAttackRelease('G5', '16n', now + 0.18);
+          synth.triggerAttackRelease('C6', '8n', now + 0.27);
+        }
+      } catch (e) {}
+    }
+
+    /**
+     * =========================================================================
+     * 2. THREE.JS 3D KITCHEN SCENE & PROCEDURAL TEXTURES
+     * =========================================================================
+     */
+    const stageFrame = document.getElementById('stage-frame');
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x9ec0b2);
+    scene.fog = new THREE.FogExp2(0x9ec0b2, 0.02);
+
+    const camera = new THREE.PerspectiveCamera(38, 9 / 16, 0.1, 100);
+    // Camera aimed lower (y = -0.35) so the plate & all 7 pancakes sit in the UPPER-MIDDLE
+    // of the screen, strictly ABOVE the bottom code card with zero overlap!
+    function updateCameraFraming() {
+      const w = stageFrame.clientWidth;
+      const h = stageFrame.clientHeight;
+      camera.aspect = w / h;
+      camera.position.set(0, 6.2, 12.6);
+      camera.lookAt(0, -0.32, 0.15);
+      camera.updateProjectionMatrix();
+    }
+    updateCameraFraming();
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(stageFrame.clientWidth, stageFrame.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    // Warm Kitchen Lighting
+    const ambientLight = new THREE.HemisphereLight(0xfff9ee, 0x8c7055, 0.78);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff4dc, 1.15);
+    sunLight.position.set(-5.5, 11.5, 7.5);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 1;
+    sunLight.shadow.camera.far = 30;
+    const d = 7;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    const rimLight = new THREE.DirectionalLight(0xdff5ff, 0.35);
+    rimLight.position.set(6, 5, -4);
+    scene.add(rimLight);
+
+    // --- Procedural Canvas Textures ---
+    function createWoodTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#c88c55';
+      ctx.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 180; i++) {
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(135, 76, 30, 0.08)' : 'rgba(235, 185, 130, 0.08)';
+        ctx.fillRect(0, Math.random() * 512, 512, 2 + Math.random() * 6);
+      }
+      // Subtle plank seams
+      ctx.fillStyle = 'rgba(95, 50, 20, 0.25)';
+      ctx.fillRect(0, 170, 512, 3);
+      ctx.fillRect(0, 340, 512, 3);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(3, 2);
+      return tex;
+    }
+
+    function createTileTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#a4c7b8';
+      ctx.fillRect(0, 0, 512, 512);
+      const rows = 8, cols = 4;
+      const w = 512 / cols, h = 512 / rows;
+      for (let r = 0; r < rows; r++) {
+        const offset = (r % 2) * (w * 0.5);
+        for (let col = -1; col <= cols; col++) {
+          const x = col * w + offset;
+          const y = r * h;
+          const shade = 158 + ((r + col) % 3) * 5;
+          ctx.fillStyle = `rgb(${shade}, ${shade + 35}, ${shade + 22})`;
+          ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
+          ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 4, y + 4, w - 8, h - 8);
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(4, 2.5);
+      return tex;
+    }
+
+    function createPlacematTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#f8f6f0';
+      ctx.fillRect(0, 0, 512, 512);
+      // Red & blue woven stripes matching the kitchen towel/placemat in video
+      const stripes = [
+        { pos: 28, w: 18, col: '#c94a4a' },
+        { pos: 54, w: 8, col: '#4a6fa5' },
+        { pos: 430, w: 18, col: '#c94a4a' },
+        { pos: 456, w: 8, col: '#4a6fa5' },
+      ];
+      stripes.forEach(s => {
+        ctx.fillStyle = s.col;
+        ctx.fillRect(0, s.pos, 512, s.w);
+        ctx.globalAlpha = 0.55;
+        ctx.fillRect(s.pos, 0, s.w, 512);
+        ctx.globalAlpha = 1.0;
+      });
+      // Subtle linen weave
+      ctx.fillStyle = 'rgba(0,0,0,0.03)';
+      for (let i = 0; i < 512; i += 4) {
+        ctx.fillRect(0, i, 512, 1);
+        ctx.fillRect(i, 0, 1, 512);
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    function createPlateTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fcfbf7';
+      ctx.fillRect(0, 0, 512, 512);
+      // Concentric blue rings around rim like classic diner/kitchen plate
+      ctx.strokeStyle = '#3b6998';
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      ctx.arc(256, 256, 226, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#5c8ab8';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(256, 256, 206, 0, Math.PI * 2);
+      ctx.stroke();
+      return new THREE.CanvasTexture(c);
+    }
+
+    // --- Build Kitchen Environment ---
+    const kitchenGroup = new THREE.Group();
+    scene.add(kitchenGroup);
+
+    // Wooden Countertop
+    const counterGeo = new THREE.BoxGeometry(26, 1.2, 12);
+    const counterMat = new THREE.MeshStandardMaterial({
+      map: createWoodTexture(),
+      roughness: 0.65,
+      metalness: 0.05
+    });
+    const counter = new THREE.Mesh(counterGeo, counterMat);
+    counter.position.set(0, -0.6, 0);
+    counter.receiveShadow = true;
+    kitchenGroup.add(counter);
+
+    // Mint Subway Tile Backsplash Wall
+    const wallGeo = new THREE.PlaneGeometry(28, 16);
+    const wallMat = new THREE.MeshStandardMaterial({
+      map: createTileTexture(),
+      roughness: 0.45
+    });
+    const wall = new THREE.Mesh(wallGeo, wallMat);
+    wall.position.set(0, 6.5, -4.6);
+    wall.receiveShadow = true;
+    kitchenGroup.add(wall);
+
+    // Sunlit Kitchen Window on the Upper-Left
+    const windowGroup = new THREE.Group();
+    windowGroup.position.set(-5.4, 5.2, -4.45);
+    const winGlass = new THREE.Mesh(
+      new THREE.PlaneGeometry(4.2, 4.4),
+      new THREE.MeshBasicMaterial({ color: 0xeaf7df })
+    );
+    windowGroup.add(winGlass);
+    // Soft outdoor tree/foliage shapes
+    const bushMat = new THREE.MeshBasicMaterial({ color: 0x93c47d });
+    const bush1 = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24), bushMat);
+    bush1.position.set(-0.7, -0.6, 0.02);
+    windowGroup.add(bush1);
+    const bush2 = new THREE.Mesh(new THREE.CircleGeometry(0.95, 24), new THREE.MeshBasicMaterial({ color: 0x7fb36b }));
+    bush2.position.set(0.6, -0.9, 0.03);
+    windowGroup.add(bush2);
+    // Window Frame Bars
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xf7f5ef, roughness: 0.5 });
+    const vBar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.5, 0.16), frameMat);
+    vBar.position.z = 0.08;
+    const hBar = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.16, 0.16), frameMat);
+    hBar.position.z = 0.08;
+    const topFrame = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.22, 0.22), frameMat);
+    topFrame.position.set(0, 2.2, 0.08);
+    const botFrame = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.25, 0.28), frameMat);
+    botFrame.position.set(0, -2.2, 0.1);
+    windowGroup.add(vBar, hBar, topFrame, botFrame);
+    kitchenGroup.add(windowGroup);
+
+    // Left Prop: Blue Ceramic Mixing Bowl + Metal Whisk
+    const bowlGroup = new THREE.Group();
+    bowlGroup.position.set(-4.35, 0, -1.65);
+    const bowlPoints = [
+      new THREE.Vector2(0.0, 0.02),
+      new THREE.Vector2(0.75, 0.02),
+      new THREE.Vector2(1.12, 0.65),
+      new THREE.Vector2(1.22, 1.25),
+      new THREE.Vector2(1.14, 1.25),
+      new THREE.Vector2(1.02, 0.65),
+      new THREE.Vector2(0.68, 0.12),
+      new THREE.Vector2(0.0, 0.12)
+    ];
+    const bowlGeo = new THREE.LatheGeometry(bowlPoints, 32);
+    const bowlMat = new THREE.MeshStandardMaterial({ color: 0x2c568c, roughness: 0.25, metalness: 0.05 });
+    const bowl = new THREE.Mesh(bowlGeo, bowlMat);
+    bowl.castShadow = true;
+    bowl.receiveShadow = true;
+    bowlGroup.add(bowl);
+
+    // Whisk sticking out of the bowl
+    const whiskGroup = new THREE.Group();
+    whiskGroup.position.set(-0.15, 1.05, 0);
+    whiskGroup.rotation.z = 0.35;
+    const handle = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.08, 1.1, 16),
+      new THREE.MeshStandardMaterial({ color: 0xd9dfe6, metalness: 0.7, roughness: 0.25 })
+    );
+    handle.position.y = 0.55;
+    whiskGroup.add(handle);
+    for (let i = 0; i < 4; i++) {
+      const loop = new THREE.Mesh(
+        new THREE.TorusGeometry(0.22, 0.015, 8, 24),
+        new THREE.MeshStandardMaterial({ color: 0xc0c8d0, metalness: 0.8, roughness: 0.2 })
+      );
+      loop.scale.set(0.65, 1.4, 1);
+      loop.position.y = -0.25;
+      loop.rotation.y = (i * Math.PI) / 4;
+      whiskGroup.add(loop);
+    }
+    bowlGroup.add(whiskGroup);
+    kitchenGroup.add(bowlGroup);
+
+    // Right Prop: Terracotta / Burnt-Orange Canister Jar with Wooden Lid
+    const jarGroup = new THREE.Group();
+    jarGroup.position.set(3.85, 0, -2.15);
+    const jarBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.92, 0.92, 2.35, 32),
+      new THREE.MeshStandardMaterial({ color: 0xc85a32, roughness: 0.42 })
+    );
+    jarBody.position.y = 1.175;
+    jarBody.castShadow = true;
+    jarBody.receiveShadow = true;
+    const jarLid = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.96, 0.96, 0.22, 32),
+      new THREE.MeshStandardMaterial({ color: 0x9e6334, roughness: 0.55 })
+    );
+    jarLid.position.y = 2.42;
+    jarLid.castShadow = true;
+    const jarKnob = new THREE.Mesh(
+      new THREE.SphereGeometry(0.18, 16, 16),
+      new THREE.MeshStandardMaterial({ color: 0x855025, roughness: 0.5 })
+    );
+    jarKnob.position.y = 2.58;
+    jarGroup.add(jarBody, jarLid, jarKnob);
+    kitchenGroup.add(jarGroup);
+
+    // Center Kitchen Placemat Towel
+    const matMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(5.6, 0.025, 3.8),
+      new THREE.MeshStandardMaterial({ map: createPlacematTexture(), roughness: 0.85 })
+    );
+    matMesh.position.set(0, 0.012, 0.15);
+    matMesh.receiveShadow = true;
+    kitchenGroup.add(matMesh);
+
+    // Center Ceramic Plate with Blue Concentric Rim
+    const plateGroup = new THREE.Group();
+    plateGroup.position.set(0, 0.03, 0.15);
+    const plateGeo = new THREE.CylinderGeometry(2.35, 1.85, 0.16, 48);
+    const plateMat = new THREE.MeshStandardMaterial({
+      map: createPlateTexture(),
+      roughness: 0.2,
+      metalness: 0.02
+    });
+    const plateMesh = new THREE.Mesh(plateGeo, plateMat);
+    plateMesh.position.y = 0.08;
+    plateMesh.receiveShadow = true;
+    plateMesh.castShadow = true;
+    plateGroup.add(plateMesh);
+    kitchenGroup.add(plateGroup);
+
+    /**
+     * =========================================================================
+     * 3. PANCAKE MESHES, NUMBER LABELS, SPATULA, BUTTER & SYRUP
+     * =========================================================================
+     */
+    const PANCAKE_HEIGHT = 0.34;
+    const STACK_BASE_Y = 0.19; // Top surface of plate
+    const STACK_Z = 0.15;
+
+    // Color palettes for raw golden batter vs fried/toasted golden-brown
+    const COLOR_BATTER_SIDE = new THREE.Color(0xf3e4c6);
+    const COLOR_BATTER_TOP  = new THREE.Color(0xe6cba0);
+    const COLOR_COOKED_SIDE = new THREE.Color(0xd28538);
+    const COLOR_COOKED_TOP  = new THREE.Color(0xb25e18);
+
+    // Create crisp number badge texture mounted directly onto the front curve of each pancake
+    function createFrontLabelTexture(num) {
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, 256, 128);
+      ctx.font = '800 94px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#1b1613';
+      ctx.fillText(String(num), 128, 68);
+      const tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    // Build a thick rounded pancake mesh for value 1..7
+    function createPancakeObject(value) {
+      const group = new THREE.Group();
+      // Radius proportional to value (1 is smallest, 7 is widest)
+      const radius = 0.78 + (value - 1) * 0.195;
+
+      // Lathe profile with rounded fluffy edges
+      const h = PANCAKE_HEIGHT;
+      const rIn = radius - 0.12;
+      const pts = [
+        new THREE.Vector2(0, 0),
+        new THREE.Vector2(rIn, 0),
+        new THREE.Vector2(radius - 0.03, 0.04),
+        new THREE.Vector2(radius, h * 0.35),
+        new THREE.Vector2(radius, h * 0.65),
+        new THREE.Vector2(radius - 0.03, h - 0.04),
+        new THREE.Vector2(rIn, h),
+        new THREE.Vector2(0, h)
+      ];
+      const geo = new THREE.LatheGeometry(pts, 44);
+      const sideMat = new THREE.MeshStandardMaterial({
+        color: COLOR_BATTER_SIDE.clone(),
+        roughness: 0.72,
+        metalness: 0.02
+      });
+      const mesh = new THREE.Mesh(geo, sideMat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+
+      // Toasted top & bottom browning disc
+      const discGeo = new THREE.CircleGeometry(rIn + 0.02, 36);
+      const topMat = new THREE.MeshStandardMaterial({
+        color: COLOR_BATTER_TOP.clone(),
+        roughness: 0.78
+      });
+      const topDisc = new THREE.Mesh(discGeo, topMat);
+      topDisc.rotation.x = -Math.PI / 2;
+      topDisc.position.y = h + 0.002;
+      group.add(topDisc);
+
+      const botDisc = new THREE.Mesh(discGeo, topMat);
+      botDisc.rotation.x = Math.PI / 2;
+      botDisc.position.y = -0.002;
+      group.add(botDisc);
+
+      // Curved front label wrapped directly on the front edge of the pancake
+      const arcAngle = 0.56;
+      const labelGeo = new THREE.CylinderGeometry(
+        radius + 0.008,
+        radius + 0.008,
+        h * 0.86,
+        16,
+        1,
+        true,
+        -arcAngle / 2,
+        arcAngle
+      );
+      const labelMat = new THREE.MeshBasicMaterial({
+        map: createFrontLabelTexture(value),
+        transparent: true,
+        depthWrite: false
+      });
+      const frontLabel = new THREE.Mesh(labelGeo, labelMat);
+      frontLabel.position.y = h * 0.5;
+      group.add(frontLabel);
+
+      // Back label on the opposite side (theta = PI) so when flipped 180° in 3D,
+      // the upright number naturally appears on the front!
+      const backLabelGeo = new THREE.CylinderGeometry(
+        radius + 0.008,
+        radius + 0.008,
+        h * 0.86,
+        16,
+        1,
+        true,
+        Math.PI - arcAngle / 2,
+        arcAngle
+      );
+      const backLabel = new THREE.Mesh(backLabelGeo, labelMat);
+      backLabel.position.y = h * 0.5;
+      backLabel.rotation.z = Math.PI; // Inverted locally so after 180° Z-flip it becomes right-side up!
+      group.add(backLabel);
+
+      return {
+        value,
+        radius,
+        group,
+        sideMat,
+        topMat,
+        toastedProgress: 0 // 0 = pale raw batter, 1 = fried/toasted golden-brown
+      };
+    }
+
+    // Spatula Object (Slides in from the right to flip sub-stacks)
+    const spatulaGroup = new THREE.Group();
+    const bladeMat = new THREE.MeshStandardMaterial({ color: 0x2b3036, metalness: 0.65, roughness: 0.35 });
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.04, 1.35), bladeMat);
+    blade.position.set(-1.15, 0, 0);
+    blade.castShadow = true;
+    // Slotted cutouts visual detail
+    const slotMat = new THREE.MeshBasicMaterial({ color: 0x15181b });
+    for (let s = -1; s <= 1; s++) {
+      const slot = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.045, 0.14), slotMat);
+      slot.position.set(-1.2, 0, s * 0.34);
+      spatulaGroup.add(slot);
+    }
+    // Angled neck + dark ergonomic handle extending right
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.05, 0.24), bladeMat);
+    neck.position.set(0.38, 0.16, 0);
+    neck.rotation.z = 0.36;
+    const grip = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.13, 1.65, 16),
+      new THREE.MeshStandardMaterial({ color: 0x1d2024, roughness: 0.6 })
+    );
+    grip.rotation.z = Math.PI / 2 - 0.12;
+    grip.position.set(1.55, 0.38, 0);
+    spatulaGroup.add(blade, neck, grip);
+    spatulaGroup.position.set(6.5, 0.5, STACK_Z);
+    scene.add(spatulaGroup);
+
+    // Grand Finale: Butter Pat + Syrup Pitcher + Glossy Maple Syrup Cascade
+    const finaleGroup = new THREE.Group();
+    scene.add(finaleGroup);
+
+    // Square pat of yellow butter
+    const butterMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.22, 0.62),
+      new THREE.MeshStandardMaterial({ color: 0xffe066, roughness: 0.35 })
+    );
+    butterMesh.castShadow = true;
+    butterMesh.visible = false;
+    finaleGroup.add(butterMesh);
+
+    // Small White Ceramic Syrup Pitcher
+    const pitcherGroup = new THREE.Group();
+    const pitcherBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.34, 0.42, 0.92, 24),
+      new THREE.MeshStandardMaterial({ color: 0xfaf8f2, roughness: 0.2 })
+    );
+    pitcherBody.castShadow = true;
+    const pitcherHandle = new THREE.Mesh(
+      new THREE.TorusGeometry(0.24, 0.05, 10, 20, Math.PI),
+      new THREE.MeshStandardMaterial({ color: 0xfaf8f2, roughness: 0.2 })
+    );
+    pitcherHandle.rotation.z = -Math.PI / 2;
+    pitcherHandle.position.set(0.38, 0.05, 0);
+    const pitcherSpout = new THREE.Mesh(
+      new THREE.ConeGeometry(0.14, 0.28, 16),
+      new THREE.MeshStandardMaterial({ color: 0xfaf8f2, roughness: 0.2 })
+    );
+    pitcherSpout.rotation.z = Math.PI / 3;
+    pitcherSpout.position.set(-0.38, 0.36, 0);
+    pitcherGroup.add(pitcherBody, pitcherHandle, pitcherSpout);
+    pitcherGroup.visible = false;
+    finaleGroup.add(pitcherGroup);
+
+    // Syrup Stream & Drips over all 7 pancakes
+    const syrupMat = new THREE.MeshPhysicalMaterial({
+      color: 0x7c2d08,
+      emissive: 0x2b0b00,
+      roughness: 0.12,
+      metalness: 0.05,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.08
+    });
+    const syrupStream = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.065, 1.5, 12),
+      syrupMat
+    );
+    syrupStream.visible = false;
+    finaleGroup.add(syrupStream);
+
+    // Syrup puddles & cascading drips attached to each sorted pancake
+    const syrupDrips = [];
+    function buildSyrupOverlays(pancakeObjs) {
+      clearSyrupOverlays();
+      pancakeObjs.forEach((p, idx) => {
+        const dripGroup = new THREE.Group();
+        // Glossy syrup pool on top of pancake
+        const poolR = p.radius * (idx === 0 ? 0.85 : 0.99);
+        const pool = new THREE.Mesh(
+          new THREE.CylinderGeometry(poolR, poolR * 1.02, 0.035, 32),
+          syrupMat
+        );
+        pool.position.y = PANCAKE_HEIGHT + 0.012;
+        dripGroup.add(pool);
+
+        // Appetizing drips running down the side edge
+        const dripCount = 7 + idx * 2;
+        for (let d = 0; d < dripCount; d++) {
+          const angle = (d / dripCount) * Math.PI * 2 + idx * 0.4;
+          const dripLen = 0.16 + ((d * 37) % 10) * 0.016;
+          const drip = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.045, 0.055, dripLen, 10),
+            syrupMat
+          );
+          drip.position.set(
+            Math.cos(angle) * (p.radius + 0.005),
+            PANCAKE_HEIGHT - dripLen * 0.45,
+            Math.sin(angle) * (p.radius + 0.005)
+          );
+          dripGroup.add(drip);
+        }
+        dripGroup.scale.set(0.01, 0.01, 0.01);
+        dripGroup.visible = false;
+        p.group.add(dripGroup);
+        syrupDrips.push(dripGroup);
+      });
+    }
+
+    function clearSyrupOverlays() {
+      syrupDrips.forEach(g => {
+        if (g.parent) g.parent.remove(g);
+      });
+      syrupDrips.length = 0;
+      butterMesh.visible = false;
+      pitcherGroup.visible = false;
+      syrupStream.visible = false;
+    }
+
+    /**
+     * =========================================================================
+     * 4. PANCAKE SORT ALGORITHM & STEP QUEUE GENERATOR
+     * =========================================================================
+     */
+    const DEFAULT_ARRAY = [3, 6, 2, 4, 7, 1, 5];
+    let initialArray = [...DEFAULT_ARRAY];
+    let pancakes = []; // Index 0 = TOP pancake, Index 6 = BOTTOM pancake
+    let stepQueue = [];
+    let currentStep = null;
+    let stepProgress = 0;
+    let isPaused = false;
+    let speedMultiplier = 1.0;
+
+    // UI Elements
+    const codeLineEls = document.querySelectorAll('.code-line');
+    const outputBoxEl = document.getElementById('output-box');
+    const lineArrayEl = document.getElementById('line-array');
+
+    function highlightCodeLine(lineIdx, isFlip = false) {
+      codeLineEls.forEach(el => {
+        el.classList.remove('active', 'active-flip');
+        if (Number(el.dataset.line) === lineIdx) {
+          el.classList.add(isFlip ? 'active-flip' : 'active');
+        }
+      });
+    }
+
+    // Precompute exact sequence of visual steps matching the Python code
+    function generatePancakeSortSteps(arr) {
+      const v = [...arr];
+      const steps = [];
+
+      steps.push({ type: 'init', line: 2, duration: 0.7 });
+
+      for (let n = v.length; n > 1; n--) {
+        let m = 0;
+        for (let i = 1; i < n; i++) {
+          if (v[i] > v[m]) m = i;
+        }
+        steps.push({
+          type: 'find_max',
+          n,
+          m,
+          maxVal: v[m],
+          line: 4,
+          duration: 0.55
+        });
+
+        steps.push({
+          type: 'check_if',
+          n,
+          m,
+          needsFlip: m !== n - 1,
+          line: 5,
+          duration: 0.4
+        });
+
+        if (m !== n - 1) {
+          if (m > 0) {
+            const k1 = m + 1;
+            const reversed1 = v.slice(0, k1).reverse();
+            v.splice(0, k1, ...reversed1);
+            steps.push({
+              type: 'flip',
+              k: k1,
+              line: 6,
+              duration: 1.1
+            });
+          } else {
+            steps.push({
+              type: 'flip_noop',
+              k: 1,
+              line: 6,
+              duration: 0.3
+            });
+          }
+
+          const reversed2 = v.slice(0, n).reverse();
+          v.splice(0, n, ...reversed2);
+          steps.push({
+            type: 'flip',
+            k: n,
+            lockIndex: n - 1,
+            line: 7,
+            duration: 1.2
+          });
+        } else {
+          steps.push({
+            type: 'lock',
+            lockIndex: n - 1,
+            line: 5,
+            duration: 0.35
+          });
+        }
+      }
+
+      // Lock top pancake (1) as well so all 7 pancakes are fried golden-brown
+      steps.push({
+        type: 'lock',
+        lockIndex: 0,
+        line: 3,
+        duration: 0.35
+      });
+
+      // print(v) + Butter & Syrup Finale
+      steps.push({
+        type: 'finale',
+        line: 8,
+        duration: 2.8,
+        result: [...v]
+      });
+
+      return steps;
+    }
+
+    // Pivot container used when lifting & rotating top k pancakes 180 degrees
+    const flipPivot = new THREE.Group();
+    scene.add(flipPivot);
+
+    function resetSimulation(arr = initialArray) {
+      initialArray = [...arr];
+      lineArrayEl.innerHTML = `v = [<span class="text-[#e0af68]">${initialArray.join(', ')}</span>]`;
+
+      // Remove old pancakes
+      pancakes.forEach(p => {
+        if (p.group.parent) p.group.parent.remove(p.group);
+      });
+      pancakes = [];
+      clearSyrupOverlays();
+
+      // Hide output box
+      outputBoxEl.classList.add('opacity-0', 'h-0');
+      outputBoxEl.classList.remove('opacity-100', 'h-auto');
+
+      // Create 7 pancakes in stack order (index 0 is top, index 6 is bottom)
+      const total = initialArray.length;
+      initialArray.forEach((val, idx) => {
+        const pObj = createPancakeObject(val);
+        const yPos = STACK_BASE_Y + (total - 1 - idx) * PANCAKE_HEIGHT;
+        pObj.group.position.set(0, yPos, STACK_Z);
+        scene.add(pObj.group);
+        pancakes.push(pObj);
+      });
+
+      spatulaGroup.position.set(6.5, 0.5, STACK_Z);
+      spatulaGroup.rotation.set(0, 0, 0);
+
+      stepQueue = generatePancakeSortSteps(initialArray);
+      currentStep = null;
+      stepProgress = 0;
+      highlightCodeLine(2);
+    }
+
+    /**
+     * =========================================================================
+     * 5. ANIMATION LOOP & SMOOTH EASING
+     * =========================================================================
+     */
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    let flipSubStack = [];
+    let flipStartCenterY = 0;
+
+    function beginNextStep() {
+      if (stepQueue.length === 0) {
+        currentStep = null;
+        return;
+      }
+      currentStep = stepQueue.shift();
+      stepProgress = 0;
+      highlightCodeLine(currentStep.line, currentStep.type === 'flip');
+
+      if (currentStep.type === 'find_max') {
+        playSound('scan');
+      } else if (currentStep.type === 'flip') {
+        playSound('slide');
+        const k = currentStep.k;
+        const total = pancakes.length;
+        const topY = STACK_BASE_Y + (total - 1) * PANCAKE_HEIGHT + PANCAKE_HEIGHT * 0.5;
+        const botY = STACK_BASE_Y + (total - k) * PANCAKE_HEIGHT + PANCAKE_HEIGHT * 0.5;
+        flipStartCenterY = (topY + botY) * 0.5;
+
+        flipPivot.position.set(0, flipStartCenterY, STACK_Z);
+        flipPivot.rotation.set(0, 0, 0);
+
+        flipSubStack = pancakes.slice(0, k);
+        flipSubStack.forEach(p => {
+          const worldY = p.group.position.y;
+          flipPivot.add(p.group);
+          p.group.position.set(0, worldY - flipStartCenterY, 0);
+        });
+      } else if (currentStep.type === 'lock') {
+        // Fry/toast the pancake that just locked into its sorted position
+        if (pancakes[currentStep.lockIndex]) {
+          pancakes[currentStep.lockIndex].isFried = true;
+        }
+      } else if (currentStep.type === 'finale') {
+        playSound('win');
+        outputBoxEl.textContent = `[${currentStep.result.join(', ')}]`;
+        outputBoxEl.classList.remove('opacity-0', 'h-0');
+        outputBoxEl.classList.add('opacity-100', 'h-auto');
+
+        buildSyrupOverlays(pancakes);
+        const topStackY = STACK_BASE_Y + pancakes.length * PANCAKE_HEIGHT;
+        butterMesh.position.set(0, topStackY + 2.4, STACK_Z);
+        butterMesh.visible = true;
+
+        pitcherGroup.position.set(3.4, topStackY + 2.1, STACK_Z);
+        pitcherGroup.rotation.set(0, 0, 0);
+        pitcherGroup.visible = true;
+      }
+    }
+
+    function updateStepAnimation(dt) {
+      if (!currentStep) {
+        beginNextStep();
+        return;
+      }
+
+      stepProgress += (dt * speedMultiplier) / currentStep.duration;
+      const t = Math.min(stepProgress, 1);
+
+      if (currentStep.type === 'find_max') {
+        const target = pancakes[currentStep.m];
+        if (target) {
+          const pulse = 1 + Math.sin(t * Math.PI) * 0.065;
+          target.group.scale.set(pulse, 1, pulse);
+          if (t >= 1) target.group.scale.set(1, 1, 1);
+        }
+      } else if (currentStep.type === 'flip') {
+        const k = currentStep.k;
+        const total = pancakes.length;
+        const cutY = STACK_BASE_Y + (total - k) * PANCAKE_HEIGHT;
+
+        if (t < 0.25) {
+          const p = easeInOutCubic(t / 0.25);
+          spatulaGroup.position.set(6.2 - p * 4.95, cutY, STACK_Z);
+          spatulaGroup.rotation.z = 0;
+        } else if (t < 0.72) {
+          const p = easeInOutCubic((t - 0.25) / 0.47);
+          if (p > 0.1 && p < 0.16 && !currentStep.playedFlipSfx) {
+            currentStep.playedFlipSfx = true;
+            playSound('flip');
+          }
+          const lift = Math.sin(p * Math.PI) * 1.15;
+          flipPivot.position.y = flipStartCenterY + lift;
+          flipPivot.rotation.z = p * Math.PI;
+
+          spatulaGroup.position.set(1.25 + Math.sin(p * Math.PI) * 0.45, cutY + lift * 0.75, STACK_Z);
+          spatulaGroup.rotation.z = Math.sin(p * Math.PI) * 0.42;
+        } else if (t < 0.88) {
+          const p = easeInOutCubic((t - 0.72) / 0.16);
+          if (p > 0.7 && !currentStep.playedLandSfx) {
+            currentStep.playedLandSfx = true;
+            playSound('land');
+          }
+          flipPivot.position.y = flipStartCenterY + (1 - p) * 0.08;
+          flipPivot.rotation.z = Math.PI;
+          spatulaGroup.position.set(1.25, cutY, STACK_Z);
+          spatulaGroup.rotation.z = 0;
+        } else {
+          const p = easeInOutCubic((t - 0.88) / 0.12);
+          spatulaGroup.position.set(1.25 + p * 5.2, cutY, STACK_Z);
+        }
+
+        if (t >= 1) {
+          flipPivot.rotation.set(0, 0, 0);
+          flipSubStack.forEach(p => {
+            scene.add(p.group);
+            p.group.rotation.set(0, 0, 0);
+          });
+          const reversed = pancakes.slice(0, k).reverse();
+          pancakes.splice(0, k, ...reversed);
+
+          pancakes.forEach((p, idx) => {
+            const yPos = STACK_BASE_Y + (total - 1 - idx) * PANCAKE_HEIGHT;
+            p.group.position.set(0, yPos, STACK_Z);
+          });
+
+          // Mark the newly sorted bottom-most pancake of this pass as fried/toasted!
+          if (typeof currentStep.lockIndex === 'number' && pancakes[currentStep.lockIndex]) {
+            pancakes[currentStep.lockIndex].isFried = true;
+          }
+          flipSubStack = [];
+        }
+      } else if (currentStep.type === 'finale') {
+        const topStackY = STACK_BASE_Y + pancakes.length * PANCAKE_HEIGHT;
+
+        // 0.0 - 0.25: Butter drops onto top pancake
+        if (t < 0.25) {
+          const p = easeInOutCubic(t / 0.25);
+          butterMesh.position.y = topStackY + 0.11 + (1 - p) * 2.2;
+        } else {
+          butterMesh.position.y = topStackY + 0.11;
+        }
+
+        // 0.12 - 0.40: Syrup pitcher glides in and tilts
+        if (t >= 0.12 && t < 0.40) {
+          const p = easeInOutCubic((t - 0.12) / 0.28);
+          pitcherGroup.position.set(3.4 - p * 2.15, topStackY + 1.45, STACK_Z);
+          pitcherGroup.rotation.z = p * 0.72;
+        }
+
+        // 0.38 - 0.82: Glossy amber maple syrup pours & cascades down all 7 pancakes
+        if (t >= 0.38 && t < 0.84) {
+          const p = (t - 0.38) / 0.46;
+          syrupStream.visible = true;
+          syrupStream.position.set(0.62, topStackY + 0.65, STACK_Z);
+          syrupStream.rotation.z = 0.28;
+
+          syrupDrips.forEach((dripGroup, idx) => {
+            const stagger = idx * 0.08;
+            const localP = Math.max(0, Math.min(1, (p - stagger) / 0.45));
+            if (localP > 0) {
+              dripGroup.visible = true;
+              const s = easeInOutCubic(localP);
+              dripGroup.scale.set(s, s, s);
+            }
+          });
+        } else if (t >= 0.84) {
+          syrupStream.visible = false;
+          // Pitcher glides back out
+          const p = easeInOutCubic((t - 0.84) / 0.16);
+          pitcherGroup.position.set(1.25 + p * 3.5, topStackY + 1.45 + p * 0.8, STACK_Z);
+          pitcherGroup.rotation.z = (1 - p) * 0.72;
+          if (t >= 1) pitcherGroup.visible = false;
+        }
+      }
+
+      if (t >= 1) {
+        currentStep = null;
+      }
+    }
+
+    // Smoothly fry/toast each pancake into golden-brown as soon as its number is sorted
+    function updatePancakeBrowning(dt) {
+      pancakes.forEach((p) => {
+        const targetToast = p.isFried ? 1.0 : 0.0;
+        p.toastedProgress += (targetToast - p.toastedProgress) * Math.min(1, dt * 5.5);
+        p.sideMat.color.lerpColors(COLOR_BATTER_SIDE, COLOR_COOKED_SIDE, p.toastedProgress);
+        p.topMat.color.lerpColors(COLOR_BATTER_TOP, COLOR_COOKED_TOP, p.toastedProgress);
+      });
+    }
+
+    let lastTime = performance.now();
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      if (!isPaused) {
+        updateStepAnimation(dt);
+      }
+      updatePancakeBrowning(dt);
+      renderer.render(scene, camera);
+    }
+
+    /**
+     * =========================================================================
+     * 6. INTERACTIVE CONTROLS & RESPONSIVE RESIZE
+     * =========================================================================
+     */
+    const btnPlayPause = document.getElementById('btn-playpause');
+    const btnSpeed = document.getElementById('btn-speed');
+    const btnReplay = document.getElementById('btn-replay');
+    const btnSound = document.getElementById('btn-sound');
+    const soundIcon = document.getElementById('sound-icon');
+
+    btnPlayPause.addEventListener('click', () => {
+      isPaused = !isPaused;
+      btnPlayPause.textContent = isPaused ? 'Play' : 'Pause';
+    });
+
+    const speeds = [1.0, 1.5, 2.0, 0.6];
+    let speedIdx = 0;
+    btnSpeed.addEventListener('click', () => {
+      speedIdx = (speedIdx + 1) % speeds.length;
+      speedMultiplier = speeds[speedIdx];
+      btnSpeed.textContent = `${speedMultiplier}x`;
+    });
+
+    btnReplay.addEventListener('click', () => {
+      isPaused = false;
+      btnPlayPause.textContent = 'Pause';
+      resetSimulation(initialArray);
+    });
+
+    btnSound.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundIcon.textContent = soundEnabled ? '🔊' : '🔇';
+      if (soundEnabled) playSound('scan');
+    });
+
+    window.addEventListener('resize', () => {
+      updateCameraFraming();
+      renderer.setSize(stageFrame.clientWidth, stageFrame.clientHeight);
+    });
+
+    // Start immediately on window load
+    window.onload = function () {
+      resetSimulation(DEFAULT_ARRAY);
+      lastTime = performance.now();
+      animate(lastTime);
+    };
+  </script>
+</body>
+</html>
