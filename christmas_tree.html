@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Christmas Particle Tree</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#03040a;color:#d7d9e8;font-family:Consolas,monospace}
+#stage{height:56vh;min-height:300px;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 100%,#14202a 0%,#080d17 38%,#02040b 78%)}
+#scene{width:100%;height:100%;display:block}
+#editor{height:44vh;min-height:180px;background:#09090d;border-top:1px solid #22242b;display:grid;grid-template-columns:42px 1fr;overflow:hidden;position:relative}
+#gutter{padding:15px 10px;text-align:right;color:#555967;font-size:11px;line-height:17px;border-right:1px solid #20212a;white-space:pre}
+#code{padding:15px 18px;white-space:pre;overflow:hidden;font-size:clamp(9px,1.02vw,13px);line-height:17px;color:#d2d4dd}
+.kw{color:#ff777e}.fn{color:#f4c27a}.str{color:#9fce91}.num{color:#b4a0ec}.com{color:#747b89}.var{color:#79c9df}
+#status{position:absolute;bottom:7px;left:58px;color:#777;font-size:10px}
+#cursor{display:inline-block;width:7px;height:13px;background:#d7d7d7;vertical-align:middle;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+@media(max-width:600px){#stage{height:58vh}#editor{height:42vh}#code{font-size:8px;line-height:14px;padding:10px}#gutter{font-size:8px;line-height:14px;padding:10px 6px}}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="scene"></canvas></div>
+<div id="editor">
+<div id="gutter"></div>
+<div id="code"><span class="com">// CHRISTMAS PARTICLE TREE — animated with Canvas</span>
+<span class="kw">const</span> canvas = document.<span class="fn">getElementById</span>(<span class="str">'scene'</span>);
+<span class="kw">const</span> ctx = canvas.<span class="fn">getContext</span>(<span class="str">'2d'</span>);
+<span class="kw">const</span> particles = [];
+<span class="kw">const</span> colors = [<span class="str">'#18a85c'</span>, <span class="str">'#37d878'</span>, <span class="str">'#e7b83e'</span>, <span class="str">'#e44738'</span>];
+
+<span class="kw">function</span> <span class="fn">createTree</span>() {
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; <span class="num">2600</span>; i++) {
+    <span class="kw">const</span> height = Math.<span class="fn">random</span>();
+    <span class="kw">const</span> radius = (<span class="num">1</span> - height) * <span class="num">145</span>;
+    particles.<span class="fn">push</span>({ height, radius, angle: Math.<span class="fn">random</span>() * Math.PI * <span class="num">2</span>,
+      color: colors[Math.<span class="fn">floor</span>(Math.<span class="fn">random</span>() * colors.length)] });
+  }
+}
+<span class="kw">function</span> <span class="fn">drawParticles</span>(time) {
+  particles.<span class="fn">forEach</span>(p =&gt; {
+    <span class="kw">const</span> a = p.angle + time * <span class="num">0.00012</span>;
+    <span class="kw">const</span> x = Math.<span class="fn">cos</span>(a) * p.radius;
+    <span class="kw">const</span> y = p.height * <span class="num">285</span>;
+    <span class="com">// twinkling lights and green pine branches</span>
+    ctx.globalAlpha = <span class="num">0.35</span> + Math.<span class="fn">abs</span>(Math.<span class="fn">sin</span>(time * <span class="num">0.003</span> + p.angle)) * <span class="num">0.65</span>;
+    ctx.fillStyle = p.color;
+    ctx.<span class="fn">fillRect</span>(centerX + x, baseY - y, <span class="num">2</span>, <span class="num">2</span>);
+  });
+}
+<span class="kw">function</span> <span class="fn">animate</span>(time) {
+  ctx.<span class="fn">clearRect</span>(<span class="num">0</span>, <span class="num">0</span>, width, height);
+  <span class="fn">drawStars</span>(time); <span class="fn">drawSnow</span>(time);
+  <span class="fn">drawParticles</span>(time); <span class="fn">drawOrnaments</span>(time);
+  <span class="fn">drawGoldenStar</span>(time); <span class="fn">drawGifts</span>();
+  <span class="fn">requestAnimationFrame</span>(animate);
+}
+<span class="fn">createTree</span>(); <span class="fn">resize</span>();
+<span class="fn">requestAnimationFrame</span>(animate); <span id="cursor"></span></div>
+<div id="status">● LIVE PREVIEW &nbsp; | &nbsp; PARTICLE SYSTEM RUNNING</div>
+</div>
+<script>
+const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
+let w,h,dpr,cx,base,scale,particles=[],stars=[],snow=[],ornaments=[];
+const palette=['#087d3c','#0caa50','#20c96b','#e5b532','#d9362e','#f2d36a','#68c78b'];
+function rand(a,b){return a+Math.random()*(b-a)}
+function resize(){
+ dpr=Math.min(devicePixelRatio||1,2);w=canvas.clientWidth;h=canvas.clientHeight;
+ canvas.width=w*dpr;canvas.height=h*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+ cx=w/2;base=h*.88;scale=Math.min(w/390,h/350,1.45);
+ particles=[];stars=[];snow=[];ornaments=[];
+ for(let i=0;i<3300;i++){
+  let t=Math.pow(Math.random(),.83),a=rand(0,Math.PI*2),r=(1-t)*rand(8,145);
+  particles.push({t,a,r,s:rand(.5,2.0),c:palette[Math.floor(Math.random()*3)],phase:rand(0,6.28),tw:rand(.3,1)});
+ }
+ for(let i=0;i<170;i++)stars.push({x:rand(0,w),y:rand(0,h*.78),r:rand(.3,1.4),p:rand(0,6.28)});
+ for(let i=0;i<105;i++)snow.push({x:rand(0,w),y:rand(0,h),r:rand(.4,1.8),v:rand(.25,1.15),drift:rand(-.3,.3)});
+ for(let i=0;i<75;i++){let t=rand(.12,.94),a=rand(0,6.28);ornaments.push({t,a,c:['#e52d2c','#e9bd3c','#d7e7dc','#c52e37'][i%4],r:rand(1.7,3.4)});}
+}
+function glow(x,y,r,color,alpha=1){
+ ctx.save();ctx.globalAlpha=alpha;ctx.shadowBlur=r*5;ctx.shadowColor=color;ctx.fillStyle=color;
+ ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore();
+}
+function drawStars(time){
+ for(const s of stars){let a=.35+.65*(.5+.5*Math.sin(time*.001+s.p));glow(s.x,s.y,s.r,'#dce8ff',a);}
+}
+function drawSnow(time){
+ ctx.fillStyle='#e6f0ff';
+ for(const s of snow){s.y+=s.v;s.x+=s.drift+Math.sin(time*.0008+s.y)*.18;if(s.y>h){s.y=-4;s.x=rand(0,w)}if(s.x<0)s.x=w;if(s.x>w)s.x=0;ctx.globalAlpha=.5;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.28);ctx.fill();}
+ ctx.globalAlpha=1;
+}
+function treePoint(t,a,rotation=0){
+ let r=(1-t)*145*scale;
+ a+=rotation;
+ return [cx+Math.cos(a)*r,base-t*290*scale];
+}
+function drawTree(time){
+ // soft silhouette glow
+ let grad=ctx.createRadialGradient(cx,base-135*scale,5,cx,base-135*scale,175*scale);
+ grad.addColorStop(0,'rgba(13,130,66,.13)');grad.addColorStop(1,'rgba(0,0,0,0)');
+ ctx.fillStyle=grad;ctx.fillRect(cx-190*scale,base-310*scale,380*scale,320*scale);
+ for(const p of particles){
+  let [x,y]=treePoint(p.t,p.a,time*.00009);
+  let tw=.3+.7*(.5+.5*Math.sin(time*.003+p.phase));
+  ctx.globalAlpha=tw*.8;ctx.fillStyle=p.c;
+  ctx.shadowBlur=p.s*2;ctx.shadowColor=p.c;
+  ctx.fillRect(x,y,p.s*scale,p.s*scale);
+ }
+ ctx.shadowBlur=0;ctx.globalAlpha=1;
+ // visible curved garlands
+ for(let row=0;row<7;row++){
+  let t=.17+row*.105, rr=(1-t)*145*scale;
+  ctx.beginPath();
+  for(let j=0;j<=100;j++){let a=j/100*Math.PI*2;let y=base-t*290*scale+Math.sin(a*2+row)*7*scale;let x=cx+Math.cos(a)*rr; if(j===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+  ctx.strokeStyle='rgba(225,177,65,.35)';ctx.lineWidth=1.3*scale;ctx.stroke();
+ }
+ for(const o of ornaments){let [x,y]=treePoint(o.t,o.a,time*.00009);glow(x,y,o.r*scale,o.c,.95);}
+ // trunk
+ ctx.fillStyle='#55331d';ctx.fillRect(cx-8*scale,base-15*scale,16*scale,27*scale);
+}
+function drawStar(time){
+ let x=cx,y=base-294*scale,rot=time*.00025;
+ ctx.save();ctx.translate(x,y);ctx.rotate(rot);
+ glow(0,0,7*scale,'#ffe17b',1);
+ ctx.fillStyle='#ffe99a';ctx.shadowColor='#ffd34f';ctx.shadowBlur=25*scale;
+ ctx.beginPath();for(let i=0;i<10;i++){let a=-Math.PI/2+i*Math.PI/5,r=(i%2?5:17)*scale;ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r);}ctx.closePath();ctx.fill();ctx.restore();
+}
+function drawGifts(){
+ const y=base+4*scale;
+ const gifts=[[-90,24,'#a91f28'],[-58,34,'#1764a0'],[-19,28,'#c48a25'],[25,37,'#a91e2c'],[67,26,'#1b6b45'],[94,21,'#d8b43d']];
+ for(let [dx,size,color] of gifts){let x=cx+dx*scale,s=size*scale;
+  ctx.fillStyle=color;ctx.fillRect(x-s/2,y-s*.72,s,s*.72);
+  ctx.fillStyle='rgba(255,255,255,.18)';ctx.fillRect(x-s/2,y-s*.72,s,3*scale);
+  ctx.fillStyle='#e8c66b';ctx.fillRect(x-2*scale,y-s*.72,4*scale,s*.72);
+  ctx.beginPath();ctx.ellipse(x-4*scale,y-s*.78,5*scale,3*scale,-.5,0,Math.PI*2);ctx.ellipse(x+4*scale,y-s*.78,5*scale,3*scale,.5,0,Math.PI*2);ctx.fill();
+ }
+}
+function drawGround(){
+ let y=base+30*scale;
+ let g=ctx.createLinearGradient(0,y-18*scale,0,h);g.addColorStop(0,'rgba(102,125,137,.22)');g.addColorStop(1,'rgba(6,12,20,0)');
+ ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,y,w*.42,25*scale,0,0,6.28);ctx.fill();
+ ctx.strokeStyle='rgba(157,177,184,.22)';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(cx,y,w*.38,17*scale,0,0,6.28);ctx.stroke();
+}
+function animate(time){ctx.clearRect(0,0,w,h);drawStars(time);drawGround();drawTree(time);drawStar(time);drawGifts();drawSnow(time);requestAnimationFrame(animate)}
+function updateCode(){
+ const lines=document.getElementById('code').innerText.split('\n').length;
+ document.getElementById('gutter').textContent=Array.from({length:lines},(_,i)=>i+1).join('\n');
+}
+window.addEventListener('resize',resize);resize();updateCode();requestAnimationFrame(animate);
+</script>
+</body>
+</html>
