@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASCII Christmas Tree — agac.py</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 45%, #0c1220 0%, #030408 100%);
+            color: #e2e8f0;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            overflow: hidden;
+        }
+
+        /* Sleek 9:16 vertical short-video frame */
+        #terminal-shell {
+            width: 100%;
+            max-width: 450px;
+            height: 96vh;
+            max-height: 880px;
+            background: #06080d;
+            border: 1px solid rgba(51, 65, 85, 0.45);
+            box-shadow:
+                0 25px 70px -15px rgba(0, 0, 0, 0.92),
+                0 0 40px rgba(15, 23, 42, 0.55),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            transition: max-width 0.3s ease, height 0.3s ease, border-radius 0.3s ease;
+        }
+
+        #terminal-shell.expanded-mode {
+            max-width: 96vw;
+            height: 96vh;
+            max-height: 96vh;
+        }
+
+        @media (max-width: 480px) {
+            #terminal-shell {
+                max-width: 100vw;
+                height: 100dvh;
+                max-height: 100dvh;
+                border-radius: 0 !important;
+                border: none;
+            }
+        }
+
+        /* Subtle custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 9999px;
+        }
+
+        #ascii-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        #ascii-canvas:active {
+            cursor: grabbing;
+        }
+
+        /* Glowing solid crimson-red block cursor matching video */
+        @keyframes cursorPulse {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0.2; }
+        }
+        .editor-cursor {
+            display: inline-block;
+            width: 7px;
+            height: 13.5px;
+            background-color: #ef4444;
+            vertical-align: middle;
+            margin-left: 1px;
+            border-radius: 1px;
+            animation: cursorPulse 0.72s infinite;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.9), 0 0 3px #fca5a5;
+        }
+
+        /* Exact Video IDE Syntax Highlighting */
+        .tok-kw  { color: #fb7185; } /* def, class, return, for, in, if, elif */
+        .tok-fn  { color: #60a5fa; } /* fib, envelope, Parts, add, done, build */
+        .tok-num { color: #fbbf24; } /* numbers & floats */
+        .tok-str { color: #86efac; } /* strings */
+        .tok-com { color: #64748b; font-style: italic; } /* comments */
+        .tok-np  { color: #38bdf8; } /* np, TAU, Y0, Y1, enums */
+    </style>
+</head>
+<body class="flex items-center justify-center p-0 sm:p-3">
+
+    <!-- 9:16 Vertical Terminal Frame -->
+    <main id="terminal-shell" class="group relative flex flex-col rounded-2xl overflow-hidden">
+
+        <!-- TOP 64%: Ultra-Dense 3D ASCII Render Canvas -->
+        <section id="viewport-section" class="relative w-full h-[64%] flex flex-col bg-[#06080d] overflow-hidden">
+
+            <!-- Unobtrusive Hover-Only Controls (Top-Left) -->
+            <div class="absolute top-2.5 left-3 z-30 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+                <button id="btn-replay" title="Replay 0s → 20s animation" class="px-2 py-0.5 text-[10px] font-medium rounded bg-[#0c111d]/90 text-slate-300 border border-slate-700/70 hover:border-emerald-400/60 hover:text-emerald-300 backdrop-blur-sm transition active:scale-95">
+                    ↻ Replay
+                </button>
+                <button id="btn-pause" title="Pause / Resume" class="px-2 py-0.5 text-[10px] font-medium rounded bg-[#0c111d]/90 text-slate-300 border border-slate-700/70 hover:border-amber-400/60 hover:text-amber-300 backdrop-blur-sm transition active:scale-95">
+                    Pause
+                </button>
+                <button id="btn-expand" title="Toggle 9:16 / Wide view" class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-medium rounded bg-[#0c111d]/90 text-slate-300 border border-slate-700/70 hover:border-sky-400/60 hover:text-sky-300 backdrop-blur-sm transition active:scale-95">
+                    ⤢
+                </button>
+            </div>
+
+            <!-- Top-Right Crimson/Coral Timer Overlay -->
+            <div class="absolute top-2.5 right-3.5 z-20 pointer-events-none font-mono text-[11.5px] tracking-wider text-[#f87171]/90 font-medium">
+                t <span id="hud-timer">00.00</span>s
+            </div>
+
+            <!-- 3D ASCII Canvas -->
+            <div id="canvas-container" class="relative flex-1 w-full h-full overflow-hidden">
+                <canvas id="ascii-canvas"></canvas>
+
+                <!-- Bottom-Left Video-Exact Telemetry HUD -->
+                <div class="absolute bottom-1.5 left-3.5 z-20 pointer-events-none font-mono text-[10.5px] leading-[1.36] tracking-tight select-none">
+                    <div class="text-slate-500/90">#999.2006.01.19 · 2026</div>
+                    <div class="text-slate-300/95">
+                        <span>rotation <span id="hud-rot" class="text-slate-100">000.00</span>°</span>
+                        <span class="ml-3.5">lights <span id="hud-lights" class="text-slate-100 ml-1">0</span></span>
+                    </div>
+                    <div class="text-slate-400/95">
+                        letters <span id="hud-letters" class="text-slate-200">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal Divider Header Bar -->
+            <div class="w-full bg-[#070a11] border-t border-b border-slate-800/80 px-3.5 py-1 text-[11px] font-mono flex items-center justify-between shrink-0 select-none">
+                <div class="flex items-center gap-2">
+                    <span class="text-slate-300 font-medium tracking-tight">py agac.py</span>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <span class="text-slate-400 text-[10.5px]">
+                        <span id="hud-status" class="text-slate-300">running</span>
+                        <span class="mx-1 text-slate-600">·</span>
+                        <span id="hud-fps" class="text-slate-300">30</span> fps
+                    </span>
+                    <button id="btn-copy" title="Copy complete Python source" class="opacity-0 group-hover:opacity-100 focus:opacity-100 px-1.5 py-0.2 text-[9.5px] rounded bg-slate-800/90 text-sky-300 border border-slate-700 hover:border-sky-400/50 transition">
+                        Copy
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- BOTTOM 36%: Live-Typing Python Code Editor (py agac.py) -->
+        <section class="w-full h-[36%] flex flex-col bg-[#06080d] overflow-hidden relative">
+            <div id="code-scroll" class="flex-1 overflow-y-auto overflow-x-hidden px-1.5 py-1.5 font-mono text-[10.5px] sm:text-[11px] leading-[1.48]">
+                <div id="code-lines" class="pb-6"></div>
+            </div>
+
+            <!-- Video-Style Bottom Progress Scrubber -->
+            <div class="w-full h-[3px] bg-[#0d121d] relative shrink-0">
+                <div id="timeline-bar" class="h-full bg-[#ef4444] shadow-[0_0_8px_rgba(239,68,68,0.85)]" style="width: 0%;"></div>
+            </div>
+        </section>
+
+        <!-- Toast Notification (no alert()) -->
+        <div id="toast" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-md bg-emerald-600/95 text-white text-[11px] font-medium shadow-lg border border-emerald-400/40 opacity-0 pointer-events-none transition-opacity duration-200 whitespace-nowrap">
+            Copied complete agac.py code!
+        </div>
+    </main>
+
+    <script>
+        /**
+         * ============================================================================
+         * 1. EXACT PYTHON CODE LINES FROM THE VIDEO (Lines 67 - 150 of agac.py)
+         * ============================================================================
+         */
+        const PYTHON_START_LINE = 67;
+        const PYTHON_CODE_LINES = [
+            "def fib(n):",
+            "    i = np.arange(n) + 0.5",
+            "    y = 1 - 2 * i / n",
+            "    r = np.sqrt(1 - y * y)",
+            "    th = np.pi * (3 - np.sqrt(5)) * i",
+            "    return np.stack([r * np.cos(th), y, r * np.sin(th)], 1)",
+            "",
+            "# ----------------------------------------------------------------------",
+            "NEEDLE, TRUNK, BALL, LIGHT, GARLAND, GIFT, RIBBON, SNOWCAP, GROUND = range(9)",
+            "Y0, Y1 = 0.42, 2.55                        # foliage from .. to top",
+            "",
+            "def envelope(y):",
+            "    f = np.clip((y - Y0) / (Y1 - Y0), 0, 1)",
+            "    return 0.03 + 0.84 * (1 - f) ** 1.08",
+            "",
+            "class Parts:",
+            "    def __init__(s):",
+            "        s.P, s.N, s.C, s.K, s.T, s.PH, s.SH = [], [], [], [], [], [], []",
+            "",
+            "    def add(s, p, n, col, kind, t0, ph=0.0, shine=0.0):",
+            "        m = len(p)",
+            "        s.P.append(np.asarray(p, float)); s.N.append(np.broadcast_to(n, (m, 3)))",
+            "        s.C.append(np.broadcast_to(np.asarray(col, float), (m, 3)))",
+            "        s.K.append(np.full(m, kind))",
+            "        for lst, v in ((s.T, t0), (s.PH, ph), (s.SH, shine)):",
+            "            lst.append(np.broadcast_to(np.asarray(v, float), (m,)))",
+            "",
+            "    def done(s):",
+            "        return [np.concatenate(v) for v in (s.P, s.N, s.C, s.K, s.T, s.PH, s.SH)]",
+            "",
+            "def build():",
+            "    rng = np.random.default_rng(7)",
+            "    q = Parts()",
+            "    tips = []",
+            "    # --- needles: whorls of drooping branches, dense at the tips",
+            "    tiers = np.linspace(Y0 + 0.02, Y1 - 0.04, 24)",
+            "    for i, y in enumerate(tiers):",
+            "        R = envelope(y)",
+            "        nb = int(7 + 11 * (1 - (y - Y0) / (Y1 - Y0)))",
+            "        for b in range(nb):",
+            "            a = TAU * b / nb + i * 0.618 * TAU + rng.normal(0, 0.08)",
+            "            L = R * rng.uniform(0.82, 1.06)",
+            "            n = int(250 + 1400 * L)",
+            "            s = rng.random(n) ** 0.65",
+            "            d = np.array([np.cos(a), 0, np.sin(a)])",
+            "            side = np.array([-np.sin(a), 0, np.cos(a)])",
+            "            spread = (0.035 + 0.11 * s) * rng.normal(0, 1, n)",
+            "            yy = y + 0.07 * s * L - 0.22 * (s * L) ** 2 + 0.03 * rng.normal(0, 1, n)",
+            "            p = d[None] * (s * L)[:, None] + side[None] * spread[:, None]",
+            "            p[:, 1] = yy",
+            "            nrm = d[None] * 0.75 + np.array([0, 0.55, 0]) + rng.normal(0, 0.25, (n, 3))",
+            "            ao = 0.35 + 0.65 * s ** 1.3",
+            "            tone = ao * rng.uniform(0.75, 1.1, n)",
+            "            col = np.array([[0.07, 0.30, 0.13]]) + np.array([[0.30, 0.62, 0.32]]) * tone[:, None]",
+            "            t0 = 1.3 + 5.0 * (y - Y0) / (Y1 - Y0) + 0.45 * s",
+            "            snow = (s > 0.45) & (rng.random(n) < 0.05 * s) & (nrm[:, 1] > 0.35)",
+            "            q.add(p[~snow], nrm[~snow], col[~snow] * ao[~snow, None], NEEDLE, t0[~snow])",
+            "            q.add(p[snow], np.array([0, 1.0, 0]), (0.92, 0.95, 1.0), SNOWCAP, t0[snow] + 0.3)",
+            "            tips.append(d * L * 0.93 + np.array([0, y + 0.07 * L - 0.22 * L * L, 0]))",
+            "    # --- trunk",
+            "    h, a = np.meshgrid(np.linspace(-0.05, 0.6, 50), np.linspace(0, TAU, 48, endpoint=False))",
+            "    p = np.stack([0.085 * np.cos(a), h, 0.085 * np.sin(a)], -1).reshape(-1, 3)",
+            "    nn = np.stack([np.cos(a), 0 * a, np.sin(a)], -1).reshape(-1, 3)",
+            "    bark = 0.75 + 0.25 * np.sin(h * 90 + a * 3).ravel()",
+            "    q.add(p, nn, np.array([0.42, 0.26, 0.14])[None] * bark[:, None], TRUNK, 0.8)",
+            "    # --- the tinsel garland: a drooping gold spiral, in swags between whorls",
+            "    u = np.linspace(0, 1, 2600)",
+            "    turns = 3.6",
+            "    yg = Y0 + 0.15 + (Y1 - Y0 - 0.45) * u",
+            "    ag = TAU * turns * u + 0.9",
+            "    swag = -0.06 * np.abs(np.sin(ag * 3.5))",
+            "    rg = envelope(yg) * 0.98 + 0.03",
+            "    base = np.stack([rg * np.cos(ag), yg + swag, rg * np.sin(ag)], -1)",
+            "    for k in range(5):",
+            "        off = rng.normal(0, 0.016, base.shape)",
+            "        q.add(base + off, np.array([0, 0.6, 0.8]), (1.0, 0.84, 0.28), GARLAND, 5.2 + 1.6 * u, shine=0.9)",
+            "    # --- ornaments, 170 fairy lights, star & wrapped gift boxes",
+            "    for idx, tip in enumerate(tips):",
+            "        if idx % 4 == 1:",
+            "            q.add(tip + fib(48) * 0.045, fib(48), (0.90, 0.13, 0.13), BALL, 6.8 + idx * 0.008, shine=1.0)",
+            "        elif idx < 170:",
+            "            q.add(tip[None], np.array([[0, 1, 0]]), (1.0, 0.88, 0.35), LIGHT, 8.2 + idx * 0.007, ph=idx)",
+            "    return q.done()"
+        ];
+
+        const FULL_PYTHON_SCRIPT = `# agac.py - 3D ASCII Christmas Tree Point-Cloud Terminal Renderer\nimport time, math, sys\nimport numpy as np\n\nTAU = 2 * np.pi\n\n` +
+            PYTHON_CODE_LINES.join('\n') +
+            `\n\nif __name__ == '__main__':\n    P, N, C, K, T, PH, SH = build()\n    # Renders spinning 3D ASCII point cloud at 30 FPS\n`;
+
+        /**
+         * ============================================================================
+         * 2. DETERMINISTIC PRNG & MATH HELPERS
+         * ============================================================================
+         */
+        function mulberry32(seed) {
+            return function() {
+                let t = seed += 0x6D2B79F5;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+
+        function randNormal(rng) {
+            let u = 0, v = 0;
+            while (u === 0) u = rng();
+            while (v === 0) v = rng();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        const TAU = Math.PI * 2;
+        const Y0 = 0.42;
+        const Y1 = 2.55;
+
+        function envelope(y) {
+            const f = Math.max(0, Math.min(1, (y - Y0) / (Y1 - Y0)));
+            return 0.03 + 0.84 * Math.pow(1 - f, 1.08);
+        }
+
+        function fibSphere(n) {
+            const pts = [];
+            const golden = Math.PI * (3 - Math.sqrt(5));
+            for (let i = 0; i < n; i++) {
+                const idx = i + 0.5;
+                const y = 1 - (2 * idx) / n;
+                const r = Math.sqrt(Math.max(0, 1 - y * y));
+                const th = golden * idx;
+                pts.push([r * Math.cos(th), y, r * Math.sin(th)]);
+            }
+            return pts;
+        }
+
+        /**
+         * ============================================================================
+         * 3. ULTRA-DENSE 3D SCULPTURAL POINT CLOUD BUILDER (Matches Video Exactly)
+         * ============================================================================
+         */
+        const KIND_GROUND  = 0;
+        const KIND_TRUNK   = 1;
+        const KIND_NEEDLE  = 2;
+        const KIND_SNOWCAP = 3;
+        const KIND_GARLAND = 4;
+        const KIND_BALL    = 5;
+        const KIND_LIGHT   = 6;
+        const KIND_STAR    = 7;
+        const KIND_GIFT    = 8;
+        const KIND_RIBBON  = 9;
+
+        function buildTreeScene() {
+            const rng = mulberry32(7);
+            const points = [];
+            const tips = [];
+            let lightCount = 0;
+
+            function addPoint(x, y, z, nx, ny, nz, r, g, b, kind, t0, ph = 0, shine = 0) {
+                const len = Math.hypot(nx, ny, nz) || 1;
+                points.push({
+                    x, y, z,
+                    nx: nx / len, ny: ny / len, nz: nz / len,
+                    r, g, b,
+                    kind, t0, ph, shine
+                });
+            }
+
+            // 1. CURVED SNOWY GROUND MOUND (0.0s -> 1.15s)
+            // Wide dome-like snow hill (y = 0 to 0.42) with bright silver-white ASCII waves & AO under tree
+            const maxGroundR = 1.48;
+            const groundRings = 46;
+            for (let ri = 0; ri <= groundRings; ri++) {
+                const rad = (ri / groundRings) * maxGroundR;
+                const count = Math.max(1, Math.floor(rad * 96));
+                for (let ci = 0; ci < count; ci++) {
+                    const ang = (ci / count) * TAU + ri * 0.21;
+                    const gx = rad * Math.cos(ang);
+                    const gz = rad * Math.sin(ang);
+
+                    // Sculptural snowy dome curve + subtle snow drift waves
+                    const dome = 0.24 * Math.exp(-(rad * rad) / 0.85);
+                    const wave = 0.014 * Math.sin(gx * 5.2 + gz * 3.1) * Math.cos(gz * 4.8);
+                    const rimLip = rad > 1.25 ? 0.028 * Math.sin(((rad - 1.25) / 0.23) * Math.PI) : 0;
+                    const gy = dome + wave + rimLip - 0.04;
+
+                    // Soft ambient occlusion shadow beneath tree skirt & right-hand gift boxes
+                    const treeAO = rad < 0.72 ? (0.42 + 0.58 * (rad / 0.72)) : 1.0;
+                    const giftDist = Math.hypot(gx - 0.52, gz - 0.34);
+                    const giftAO = giftDist < 0.36 ? (0.55 + 0.45 * (giftDist / 0.36)) : 1.0;
+                    const shade = Math.min(1.05, (0.86 + 0.18 * (1 - rad / maxGroundR)) * treeAO * giftAO);
+
+                    // Smooth radial reveal 0.0s -> 1.15s
+                    const t0 = 0.02 + (rad / maxGroundR) * 1.05 + rng() * 0.08;
+
+                    addPoint(
+                        gx, gy, gz,
+                        gx * 0.34, 1.0, gz * 0.34,
+                        0.86 * shade, 0.91 * shade, 1.00 * shade,
+                        KIND_GROUND, t0, rad * 4.0, 0.22
+                    );
+                }
+            }
+
+            // 2. CYLINDRICAL BARK TRUNK (0.45s -> 1.2s)
+            for (let hi = 0; hi < 46; hi++) {
+                const h = (hi / 45) * 0.58;
+                for (let ai = 0; ai < 44; ai++) {
+                    const a = (ai / 44) * TAU;
+                    const rad = 0.088;
+                    const bark = 0.74 + 0.26 * Math.sin(h * 90 + a * 3);
+                    const t0 = 0.45 + (h / 0.58) * 0.72;
+                    addPoint(
+                        rad * Math.cos(a), h, rad * Math.sin(a),
+                        Math.cos(a), 0.06, Math.sin(a),
+                        0.48 * bark, 0.29 * bark, 0.15 * bark,
+                        KIND_TRUNK, t0, 0, 0.05
+                    );
+                }
+            }
+
+            // 3. 24 TIERS OF DENSE DROOPING PINE NEEDLE WHORLS & FROSTED SNOW CAPS (1.2s -> 5.2s)
+            const numTiers = 24;
+            for (let i = 0; i < numTiers; i++) {
+                const fracY = i / (numTiers - 1);
+                const y = (Y0 + 0.02) + fracY * ((Y1 - 0.04) - (Y0 + 0.02));
+                const R = envelope(y);
+                const nb = Math.floor(8 + 12 * (1 - fracY));
+
+                for (let b = 0; b < nb; b++) {
+                    const a = (TAU * b) / nb + i * 0.618 * TAU + randNormal(rng) * 0.08;
+                    const L = R * (0.84 + rng() * 0.24);
+                    // High point density so every branch whorl looks lush and sculptural
+                    const n = Math.floor(175 + 720 * L);
+                    const dx = Math.cos(a), dz = Math.sin(a);
+                    const sx = -Math.sin(a), sz = Math.cos(a);
+
+                    for (let k = 0; k < n; k++) {
+                        const s = Math.pow(rng(), 0.64);
+                        const spread = (0.036 + 0.115 * s) * randNormal(rng);
+                        const sl = s * L;
+                        const yy = y + 0.072 * sl - 0.22 * (sl * sl) + 0.026 * randNormal(rng);
+                        const px = dx * sl + sx * spread;
+                        const pz = dz * sl + sz * spread;
+
+                        const nrmX = dx * 0.76 + randNormal(rng) * 0.22;
+                        const nrmY = 0.58 + randNormal(rng) * 0.22;
+                        const nrmZ = dz * 0.76 + randNormal(rng) * 0.22;
+
+                        const ao = 0.36 + 0.64 * Math.pow(s, 1.25);
+                        const tone = ao * (0.76 + rng() * 0.38);
+
+                        // Exact 1.2s -> 5.2s progressive upward build
+                        const t0 = 1.20 + 3.85 * fracY + 0.18 * s;
+
+                        // Frosted white snow caps on outer upper branch tips
+                        const snowProb = (0.055 + 0.065 * fracY) * s;
+                        const isSnow = (s > 0.44) && (rng() < snowProb) && (nrmY > 0.34);
+
+                        if (isSnow) {
+                            addPoint(
+                                px, yy + 0.012, pz,
+                                0, 1.0, 0,
+                                0.92, 0.96, 1.0,
+                                KIND_SNOWCAP, t0 + 0.12, 0, 0.35
+                            );
+                        } else {
+                            // Rich forest & emerald greens (#14532d -> #4ade80)
+                            const cr = (0.06 + 0.20 * tone) * ao;
+                            const cg = (0.28 + 0.58 * tone) * ao;
+                            const cb = (0.12 + 0.26 * tone) * ao;
+                            addPoint(px, yy, pz, nrmX, nrmY, nrmZ, cr, cg, cb, KIND_NEEDLE, t0, 0, 0.08);
+                        }
+                    }
+
+                    const tipL = L * 0.94;
+                    const tipY = y + 0.072 * tipL - 0.22 * tipL * tipL;
+                    tips.push({
+                        x: dx * tipL,
+                        y: tipY,
+                        z: dz * tipL,
+                        fracY,
+                        ang: a
+                    });
+                }
+            }
+
+            // 4. THICK MULTI-STRAND SHIMMERING GOLDEN TINSEL GARLAND (5.2s -> 6.8s)
+            const garlandSteps = 2200;
+            const turns = 3.6;
+            for (let gi = 0; gi < garlandSteps; gi++) {
+                const u = gi / (garlandSteps - 1);
+                const yg = Y0 + 0.15 + (Y1 - Y0 - 0.44) * u;
+                const ag = TAU * turns * u + 0.9;
+                const swag = -0.062 * Math.abs(Math.sin(ag * 3.5));
+                const rg = envelope(yg) * 0.985 + 0.034;
+                const bx = rg * Math.cos(ag);
+                const by = yg + swag;
+                const bz = rg * Math.sin(ag);
+
+                const t0 = 5.20 + 1.58 * u;
+
+                // 5 braided sub-strands matching `for k in range(5)` in agac.py
+                for (let strand = 0; strand < 5; strand++) {
+                    const ox = bx + randNormal(rng) * 0.015;
+                    const oy = by + randNormal(rng) * 0.015;
+                    const oz = bz + randNormal(rng) * 0.015;
+                    addPoint(
+                        ox, oy, oz,
+                        Math.cos(ag), 0.58, Math.sin(ag),
+                        1.00, 0.82, 0.22,
+                        KIND_GARLAND, t0, u * 16 + strand, 0.95
+                    );
+                }
+            }
+
+            // 5. GLOSSY 3D SPHERICAL ORNAMENTS / BALLS (6.8s -> 8.2s)
+            const ballSphere = fibSphere(56);
+            const ballPalette = [
+                [0.95, 0.16, 0.20], // Vibrant Crimson Red (#ef4444)
+                [0.20, 0.48, 0.98], // Royal Sapphire Blue (#3b82f6)
+                [0.98, 0.78, 0.14]  // Bright Metallic Gold (#eab308)
+            ];
+
+            for (let ti = 0; ti < tips.length; ti++) {
+                const tip = tips[ti];
+                if (tip.fracY > 0.91) continue;
+
+                if (ti % 4 === 1) {
+                    const bCol = ballPalette[(ti >> 2) % ballPalette.length];
+                    const bRad = 0.049;
+                    const bx = tip.x * 0.965;
+                    const by = tip.y - 0.035;
+                    const bz = tip.z * 0.965;
+                    const t0 = 6.80 + tip.fracY * 1.38;
+
+                    for (const sp of ballSphere) {
+                        addPoint(
+                            bx + sp[0] * bRad,
+                            by + sp[1] * bRad,
+                            bz + sp[2] * bRad,
+                            sp[0], sp[1], sp[2],
+                            bCol[0], bCol[1], bCol[2],
+                            KIND_BALL, t0, ti * 0.45, 1.0
+                        );
+                    }
+                }
+            }
+
+            // 6. 170 WARM GLOWING FAIRY LIGHTS (8.2s -> 9.6s)
+            const lightPalette = [
+                [1.00, 0.93, 0.72], // Warm White
+                [1.00, 0.78, 0.22], // Amber Gold
+                [1.00, 0.28, 0.28], // Warm Red
+                [0.28, 0.92, 1.00], // Ice Cyan
+                [0.32, 0.98, 0.54]  // Emerald Green
+            ];
+
+            const stepStride = Math.max(1, Math.floor(tips.length / 170));
+            for (let i = 0; i < tips.length && lightCount < 170; i += stepStride) {
+                const tip = tips[i];
+                const lCol = lightPalette[lightCount % lightPalette.length];
+                const t0 = 8.20 + (lightCount / 170) * 1.35;
+                addPoint(
+                    tip.x * 1.018,
+                    tip.y + 0.006,
+                    tip.z * 1.018,
+                    tip.x, 0.35, tip.z,
+                    lCol[0], lCol[1], lCol[2],
+                    KIND_LIGHT, t0, lightCount * 0.73, 1.0
+                );
+                lightCount++;
+            }
+            for (let i = 1; i < tips.length && lightCount < 170; i += 2) {
+                const tip = tips[i];
+                const lCol = lightPalette[lightCount % lightPalette.length];
+                const t0 = 8.20 + (lightCount / 170) * 1.35;
+                addPoint(
+                    tip.x * 1.012,
+                    tip.y + 0.004,
+                    tip.z * 1.012,
+                    tip.x, 0.35, tip.z,
+                    lCol[0], lCol[1], lCol[2],
+                    KIND_LIGHT, t0, lightCount * 0.73, 1.0
+                );
+                lightCount++;
+            }
+
+            // 7. RADIANT 3D GOLDEN 5-POINTED STAR TOPPER AT APEX (y = 2.62, ignites at 8.7s)
+            const starY = 2.63;
+            for (let s = 0; s < 340; s++) {
+                const ang = (s / 340) * TAU;
+                // Crisp 5-pointed star polar equation
+                const innerOuter = Math.cos(5 * ang);
+                const rMax = 0.16 * (0.46 + 0.54 * Math.pow(Math.max(0, innerOuter), 1.45) + 0.10 * Math.abs(innerOuter));
+                const fill = Math.sqrt(rng());
+                const rad = rMax * fill;
+                const sx = rad * Math.sin(ang);
+                const sy = starY + rad * Math.cos(ang);
+                const sz = (rng() - 0.5) * 0.045 * (1 - fill * 0.45);
+
+                addPoint(sx, sy, sz, 0, 0.3, 1, 1.0, 0.95, 0.50, KIND_STAR, 8.70, s * 0.08, 1.0);
+                addPoint(sz, sy, sx, 1, 0.3, 0, 1.0, 0.92, 0.42, KIND_STAR, 8.70, s * 0.08, 1.0);
+            }
+
+            // 8. TWO DETAILED 3D WRAPPED GIFT BOXES ON SNOWY FLOOR (9.6s -> 11.2s)
+            // Larger Royal-Blue Box (#1d4ed8) with Bright Yellow-Gold Ribbon (#facc15)
+            // Crimson-Red Box (#dc2626) with Crisp White/Gold Ribbon & 3D Bow Loops
+            const gifts = [
+                {
+                    x: 0.46, z: 0.44,
+                    w: 0.30, h: 0.23, d: 0.28,
+                    rot: -0.28,
+                    box: [0.13, 0.35, 0.88],   // Royal Blue (#1d4ed8)
+                    rib: [0.99, 0.83, 0.14],   // Bright Yellow-Gold (#facc15)
+                    bowAccent: [1.0, 0.92, 0.35],
+                    t0: 9.60
+                },
+                {
+                    x: 0.73, z: 0.18,
+                    w: 0.24, h: 0.19, d: 0.23,
+                    rot: 0.30,
+                    box: [0.90, 0.16, 0.18],   // Crimson Red (#dc2626)
+                    rib: [0.98, 0.96, 0.88],   // Crisp White/Gold Ribbon
+                    bowAccent: [1.0, 0.86, 0.30],
+                    t0: 10.25
+                }
+            ];
+
+            gifts.forEach((g) => {
+                const cosR = Math.cos(g.rot), sinR = Math.sin(g.rot);
+                const hw = g.w / 2, hd = g.d / 2;
+                const step = 0.017;
+                const baseY = 0.11;
+
+                // Top lid + ribbon cross
+                for (let u = -hw; u <= hw; u += step) {
+                    for (let v = -hd; v <= hd; v += step) {
+                        const isRib = Math.abs(u) < 0.025 || Math.abs(v) < 0.025;
+                        const col = isRib ? g.rib : g.box;
+                        const rx = u * cosR - v * sinR + g.x;
+                        const rz = u * sinR + v * cosR + g.z;
+                        addPoint(rx, baseY + g.h, rz, 0, 1, 0, col[0], col[1], col[2], isRib ? KIND_RIBBON : KIND_GIFT, g.t0, 0, 0.5);
+                    }
+                }
+
+                // 3D Sculpted Bow Loops on top center
+                const bowCol = g.bowAccent || g.rib;
+                for (let ba = 0; ba < TAU; ba += 0.14) {
+                    const loopR = 0.065 * Math.abs(Math.sin(2 * ba));
+                    const bu = loopR * Math.cos(ba);
+                    const bv = loopR * Math.sin(ba);
+                    const by = baseY + g.h + 0.02 + 0.026 * Math.abs(Math.sin(2 * ba));
+                    const rx = bu * cosR - bv * sinR + g.x;
+                    const rz = bu * sinR + bv * cosR + g.z;
+                    addPoint(rx, by, rz, 0, 1, 0, bowCol[0], bowCol[1], bowCol[2], KIND_RIBBON, g.t0 + 0.25, 0, 0.9);
+                }
+
+                // Front & Back faces
+                for (let u = -hw; u <= hw; u += step) {
+                    for (let y = 0; y <= g.h; y += step) {
+                        const isRib = Math.abs(u) < 0.025 || Math.abs(y - g.h * 0.5) < 0.02;
+                        const col = isRib ? g.rib : g.box;
+                        for (const sgn of [-1, 1]) {
+                            const lx = u, lz = sgn * hd;
+                            const rx = lx * cosR - lz * sinR + g.x;
+                            const rz = lx * sinR + lz * cosR + g.z;
+                            const nx = -sgn * sinR, nz = sgn * cosR;
+                            addPoint(rx, baseY + y, rz, nx, 0.12, nz, col[0], col[1], col[2], isRib ? KIND_RIBBON : KIND_GIFT, g.t0, 0, 0.4);
+                        }
+                    }
+                }
+
+                // Left & Right faces
+                for (let v = -hd; v <= hd; v += step) {
+                    for (let y = 0; y <= g.h; y += step) {
+                        const isRib = Math.abs(v) < 0.025 || Math.abs(y - g.h * 0.5) < 0.02;
+                        const col = isRib ? g.rib : g.box;
+                        for (const sgn of [-1, 1]) {
+                            const lx = sgn * hw, lz = v;
+                            const rx = lx * cosR - lz * sinR + g.x;
+                            const rz = lx * sinR + lz * cosR + g.z;
+                            const nx = sgn * cosR, nz = sgn * sinR;
+                            addPoint(rx, baseY + y, rz, nx, 0.12, nz, col[0], col[1], col[2], isRib ? KIND_RIBBON : KIND_GIFT, g.t0, 0, 0.4);
+                        }
+                    }
+                }
+            });
+
+            return { points, totalLights: lightCount };
+        }
+
+        /**
+         * ============================================================================
+         * 4. TWINKLING STARRY NIGHT SKY (`. ` and `*` glyphs + micro starlight)
+         * ============================================================================
+         */
+        function generateStarfield(count = 145) {
+            const rng = mulberry32(2026);
+            const stars = [];
+            for (let i = 0; i < count; i++) {
+                const isIceBlue = rng() < 0.42;
+                const isAsterisk = rng() < 0.24;
+                stars.push({
+                    nx: rng(),
+                    ny: rng() * 0.88,
+                    glyph: isAsterisk ? '*' : '.',
+                    isIceBlue,
+                    phase: rng() * TAU,
+                    speed: 1.5 + rng() * 2.6,
+                    baseAlpha: 0.28 + rng() * 0.65
+                });
+            }
+            return stars;
+        }
+
+        /**
+         * ============================================================================
+         * 5. LIVE SYNTAX-HIGHLIGHTED PYTHON EDITOR CONTROLLER (py agac.py)
+         * ============================================================================
+         */
+        class PythonEditorAnimator {
+            constructor() {
+                this.container = document.getElementById('code-lines');
+                this.scrollEl = document.getElementById('code-scroll');
+                this.totalChars = PYTHON_CODE_LINES.reduce((acc, l) => acc + l.length + 1, 0);
+                this.lastRenderedCount = -1;
+            }
+
+            highlightSyntax(rawText) {
+                let s = rawText
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+
+                let commentPart = '';
+                const hashIdx = s.indexOf('#');
+                if (hashIdx !== -1) {
+                    commentPart = `<span class="tok-com">${s.slice(hashIdx)}</span>`;
+                    s = s.slice(0, hashIdx);
+                }
+
+                s = s.replace(/\b(\d+(\.\d+)?)\b/g, '<span class="tok-num">$1</span>');
+                s = s.replace(/\b(def|return|for|in|if|elif|else|class|range|enumerate)\b/g, '<span class="tok-kw">$1</span>');
+                s = s.replace(/(<span class="tok-kw">def<\/span>\s+)([a-zA-Z_]\w*)/g, '$1<span class="tok-fn">$2</span>');
+                s = s.replace(/(<span class="tok-kw">class<\/span>\s+)([a-zA-Z_]\w*)/g, '$1<span class="tok-fn">$2</span>');
+                s = s.replace(/\b(np|TAU|Y0|Y1|NEEDLE|TRUNK|BALL|LIGHT|GARLAND|GIFT|RIBBON|SNOWCAP|GROUND)\b/g, '<span class="tok-np">$1</span>');
+
+                return s + commentPart;
+            }
+
+            update(simTime) {
+                // Smooth continuous typing synced across 0s -> 19.5s (just like the 20s video)
+                const progress = Math.min(1, Math.max(0, simTime / 19.5));
+                const targetChars = Math.floor(progress * this.totalChars);
+
+                if (targetChars === this.lastRenderedCount) return;
+                this.lastRenderedCount = targetChars;
+
+                let remaining = targetChars;
+                let html = '';
+                let activeLineIdx = 0;
+
+                for (let i = 0; i < PYTHON_CODE_LINES.length; i++) {
+                    const line = PYTHON_CODE_LINES[i];
+                    const lineNum = PYTHON_START_LINE + i;
+                    const lineNumStr = String(lineNum).padStart(3, ' ');
+
+                    if (remaining <= 0) break;
+
+                    activeLineIdx = i;
+                    let visiblePart = '';
+                    let isCursorLine = false;
+
+                    if (remaining >= line.length + 1) {
+                        visiblePart = line;
+                        remaining -= (line.length + 1);
+                    } else {
+                        visiblePart = line.slice(0, remaining);
+                        remaining = 0;
+                        isCursorLine = true;
+                    }
+
+                    const highlighted = this.highlightSyntax(visiblePart);
+                    const cursorHtml = (isCursorLine || (i === PYTHON_CODE_LINES.length - 1 && progress >= 1))
+                        ? '<span class="editor-cursor"></span>'
+                        : '';
+                    const rowBg = isCursorLine ? 'bg-slate-900/60' : '';
+
+                    html += `<div class="flex items-center px-1 rounded ${rowBg}">` +
+                            `<span class="w-7 shrink-0 text-right pr-2.5 text-slate-600 select-none">${lineNumStr}</span>` +
+                            `<pre class="m-0 font-mono whitespace-pre text-slate-200">${highlighted}${cursorHtml}</pre>` +
+                            `</div>`;
+                }
+
+                this.container.innerHTML = html;
+
+                const lineHeight = 16.3;
+                const targetScroll = Math.max(0, (activeLineIdx * lineHeight) - this.scrollEl.clientHeight * 0.65);
+                this.scrollEl.scrollTop = targetScroll;
+            }
+        }
+
+        /**
+         * ============================================================================
+         * 6. DENSE SCULPTURAL 3D ASCII RENDERER WITH BLOOM POST-PROCESSING
+         * ============================================================================
+         */
+        window.onload = function() {
+            const canvas = document.getElementById('ascii-canvas');
+            const ctx = canvas.getContext('2d', { alpha: false });
+            const container = document.getElementById('canvas-container');
+            const terminalShell = document.getElementById('terminal-shell');
+
+            const hudTimer = document.getElementById('hud-timer');
+            const hudRot = document.getElementById('hud-rot');
+            const hudLights = document.getElementById('hud-lights');
+            const hudLetters = document.getElementById('hud-letters');
+            const hudFps = document.getElementById('hud-fps');
+            const hudStatus = document.getElementById('hud-status');
+            const timelineBar = document.getElementById('timeline-bar');
+
+            const scene = buildTreeScene();
+            const stars = generateStarfield(145);
+            const codeEditor = new PythonEditorAnimator();
+
+            let simTime = 0;
+            let isPaused = false;
+            let autoRotAngle = 0.0; // Starts at 000.00°
+            let userYawOffset = 0;
+            let userPitch = 0.14;
+            let zoomScale = 1.0;
+
+            let isDragging = false;
+            let lastPointerX = 0;
+            let lastPointerY = 0;
+
+            function onPointerDown(x, y) {
+                isDragging = true;
+                lastPointerX = x;
+                lastPointerY = y;
+            }
+
+            function onPointerMove(x, y) {
+                if (!isDragging) return;
+                const dx = x - lastPointerX;
+                const dy = y - lastPointerY;
+                lastPointerX = x;
+                lastPointerY = y;
+                userYawOffset += dx * 0.009;
+                userPitch = Math.max(-0.42, Math.min(0.62, userPitch + dy * 0.006));
+            }
+
+            function onPointerUp() {
+                isDragging = false;
+            }
+
+            canvas.addEventListener('mousedown', e => onPointerDown(e.clientX, e.clientY));
+            window.addEventListener('mousemove', e => onPointerMove(e.clientX, e.clientY));
+            window.addEventListener('mouseup', onPointerUp);
+
+            canvas.addEventListener('touchstart', e => {
+                if (e.touches.length === 1) {
+                    onPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+            window.addEventListener('touchmove', e => {
+                if (isDragging && e.touches.length === 1) {
+                    onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+            window.addEventListener('touchend', onPointerUp);
+
+            canvas.addEventListener('wheel', e => {
+                e.preventDefault();
+                zoomScale = Math.max(0.7, Math.min(1.6, zoomScale - e.deltaY * 0.0008));
+            }, { passive: false });
+
+            // Replay / Pause / Expand / Copy buttons
+            document.getElementById('btn-replay').addEventListener('click', () => {
+                simTime = 0;
+                autoRotAngle = 0.0;
+                userYawOffset = 0;
+                codeEditor.lastRenderedCount = -1;
+                if (isPaused) {
+                    isPaused = false;
+                    document.getElementById('btn-pause').textContent = 'Pause';
+                    hudStatus.textContent = 'running';
+                }
+            });
+
+            document.getElementById('btn-pause').addEventListener('click', (e) => {
+                isPaused = !isPaused;
+                e.target.textContent = isPaused ? 'Resume' : 'Pause';
+                hudStatus.textContent = isPaused ? 'paused' : 'running';
+            });
+
+            const btnExpand = document.getElementById('btn-expand');
+            if (btnExpand) {
+                btnExpand.addEventListener('click', () => {
+                    terminalShell.classList.toggle('expanded-mode');
+                    setTimeout(resizeCanvas, 320);
+                });
+            }
+
+            document.getElementById('btn-copy').addEventListener('click', () => {
+                const ta = document.createElement('textarea');
+                ta.value = FULL_PYTHON_SCRIPT;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+
+                const toast = document.getElementById('toast');
+                toast.style.opacity = '1';
+                setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+            });
+
+            // High-resolution ASCII grid (~115 columns x 75 rows in 9:16 frame -> ~8,486 letters)
+            let cols = 0, rows = 0;
+            let cellW = 3.85, cellH = 6.95;
+            let zBuffer = new Float32Array(0);
+            let charBuffer = [];
+            let colorBuffer = [];
+            let glowTypeBuffer = [];
+            let glowColorBuffer = [];
+
+            function resizeCanvas() {
+                const dpr = Math.min(window.devicePixelRatio || 1, 2);
+                const rect = container.getBoundingClientRect();
+                canvas.width = Math.floor(rect.width * dpr);
+                canvas.height = Math.floor(rect.height * dpr);
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+                // Target ~115 columns x 76 rows for ultra-crisp sculptural ASCII art
+                const targetCols = rect.width > 550 ? Math.floor(rect.width / 4.2) : 115;
+                cellW = rect.width / targetCols;
+                cellH = cellW * 1.78;
+
+                cols = Math.max(80, Math.floor(rect.width / cellW));
+                rows = Math.max(48, Math.floor(rect.height / cellH));
+
+                const totalCells = cols * rows;
+                zBuffer = new Float32Array(totalCells);
+                charBuffer = new Array(totalCells);
+                colorBuffer = new Array(totalCells);
+                glowTypeBuffer = new Uint8Array(totalCells);
+                glowColorBuffer = new Array(totalCells);
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            // Exact dense ASCII luminance ramp specified in prompt
+            const ASCII_RAMP = " .'`^\",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+            const RAMP_LEN = ASCII_RAMP.length;
+
+            // Directional key light + soft rim light
+            const lx = 0.44, ly = 0.72, lz = 0.54;
+            const lLen = Math.hypot(lx, ly, lz);
+            const LDX = lx / lLen, LDY = ly / lLen, LDZ = lz / lLen;
+
+            let lastFrameTime = performance.now();
+            let fpsSmooth = 30;
+
+            function renderFrame(now) {
+                const rawDt = (now - lastFrameTime) / 1000;
+                lastFrameTime = now;
+                const dt = Math.min(0.05, Math.max(0.001, rawDt));
+
+                if (!isPaused) {
+                    simTime += dt;
+                    if (!isDragging) {
+                        // ~18 deg/sec smooth continuous rotation matching video
+                        autoRotAngle += dt * (18.0 * Math.PI / 180);
+                    }
+                }
+
+                const instFps = 1 / dt;
+                fpsSmooth = fpsSmooth * 0.9 + instFps * 0.1;
+
+                zBuffer.fill(-9999);
+                charBuffer.fill(null);
+                glowTypeBuffer.fill(0);
+
+                const viewW = cols * cellW;
+                const viewH = rows * cellH;
+
+                // 1. Deep Midnight Gradient Sky (#05070c to #090d16)
+                const skyGrad = ctx.createLinearGradient(0, 0, 0, viewH);
+                skyGrad.addColorStop(0, '#05070c');
+                skyGrad.addColorStop(0.65, '#070a12');
+                skyGrad.addColorStop(1, '#090d16');
+                ctx.fillStyle = skyGrad;
+                ctx.fillRect(0, 0, viewW, viewH);
+
+                // Crisp 8px monospace font for sculptural ASCII rendering
+                const fontSize = Math.max(7.2, Math.min(9.5, cellH * 0.98));
+                ctx.font = `600 ${fontSize.toFixed(1)}px "JetBrains Mono", "Fira Code", monospace`;
+                ctx.textBaseline = 'top';
+
+                // 2. Twinkling Starry Night Sky (`.` and `*` glyphs in white & ice-blue)
+                for (let i = 0; i < stars.length; i++) {
+                    const st = stars[i];
+                    const twinkle = 0.42 + 0.58 * Math.sin(simTime * st.speed + st.phase);
+                    const alpha = (st.baseAlpha * twinkle).toFixed(2);
+                    ctx.fillStyle = st.isIceBlue
+                        ? `rgba(147, 197, 253, ${alpha})`
+                        : `rgba(241, 245, 249, ${alpha})`;
+                    ctx.fillText(st.glyph, st.nx * viewW, st.ny * viewH);
+                }
+
+                const totalYaw = autoRotAngle + userYawOffset;
+                const cosY = Math.cos(totalYaw);
+                const sinY = Math.sin(totalYaw);
+                const cosP = Math.cos(userPitch);
+                const sinP = Math.sin(userPitch);
+
+                const charAspect = cellH / cellW;
+                const baseScale = Math.min(rows * 0.345, (cols / charAspect) * 0.415) * zoomScale;
+                const centerX = cols * 0.5;
+                const centerY = rows * 0.875;
+                const camDist = 4.65;
+
+                let activeLights = 0;
+                let activeLetters = 0;
+
+                // 3. Project & Z-Buffer Rasterize 3D Tree Points
+                const pts = scene.points;
+                for (let i = 0; i < pts.length; i++) {
+                    const pt = pts[i];
+                    if (pt.t0 > simTime) continue;
+
+                    const age = simTime - pt.t0;
+                    const appear = age < 0.24 ? age / 0.24 : 1.0;
+
+                    if (pt.kind === KIND_LIGHT) {
+                        activeLights++;
+                    }
+
+                    // Rotate around Y axis
+                    const rx = pt.x * cosY - pt.z * sinY;
+                    const rz1 = pt.x * sinY + pt.z * cosY;
+                    const ry1 = pt.y;
+
+                    // Camera pitch tilt
+                    const ry = ry1 * cosP - rz1 * sinP;
+                    const rz = ry1 * sinP + rz1 * cosP;
+
+                    const zCam = camDist - rz;
+                    if (zCam <= 0.5) continue;
+                    const persp = camDist / zCam;
+
+                    const sx = Math.round(centerX + rx * baseScale * charAspect * persp);
+                    const sy = Math.round(centerY - ry * baseScale * persp);
+
+                    if (sx < 0 || sx >= cols || sy < 0 || sy >= rows) continue;
+
+                    const cellIdx = sy * cols + sx;
+                    const zBias = (pt.kind === KIND_LIGHT || pt.kind === KIND_STAR) ? 0.06 : 0;
+                    const depth = rz + zBias;
+
+                    if (depth <= zBuffer[cellIdx]) continue;
+                    zBuffer[cellIdx] = depth;
+
+                    // Rotate surface normal
+                    const rnx = pt.nx * cosY - pt.nz * sinY;
+                    const rnz1 = pt.nx * sinY + pt.nz * cosY;
+                    const rny = pt.ny * cosP - rnz1 * sinP;
+                    const rnz = pt.ny * sinP + rnz1 * cosP;
+
+                    // Phong diffuse + specular shading
+                    const ndotl = Math.max(0, rnx * LDX + rny * LDY + rnz * LDZ);
+                    const halfX = LDX, halfY = LDY, halfZ = LDZ + 1;
+                    const hLen = Math.hypot(halfX, halfY, halfZ) || 1;
+                    const ndoth = Math.max(0, (rnx * halfX + rny * halfY + rnz * halfZ) / hLen);
+                    const spec = pt.shine * Math.pow(ndoth, 18);
+
+                    let lum = (0.30 + 0.70 * ndotl + spec * 0.85) * appear;
+                    let rampIdx = Math.min(RAMP_LEN - 1, Math.max(1, Math.floor(lum * (RAMP_LEN - 1))));
+                    let glyph = ASCII_RAMP[rampIdx];
+
+                    let cr = pt.r * lum;
+                    let cg = pt.g * lum;
+                    let cb = pt.b * lum;
+                    let gType = 0;
+
+                    switch (pt.kind) {
+                        case KIND_GROUND: {
+                            // Crisp silver-white snowy waves (#, =, +, :, .)
+                            const waveLum = Math.min(1, lum * (0.88 + 0.14 * Math.sin(pt.ph)));
+                            const gIdx = Math.min(RAMP_LEN - 1, Math.max(1, Math.floor(waveLum * (RAMP_LEN - 4))));
+                            glyph = ASCII_RAMP[gIdx];
+                            break;
+                        }
+                        case KIND_NEEDLE: {
+                            // Rich sculptural emerald & forest greens
+                            const nIdx = Math.min(RAMP_LEN - 3, Math.max(4, Math.floor(lum * (RAMP_LEN - 4))));
+                            glyph = ASCII_RAMP[nIdx];
+                            break;
+                        }
+                        case KIND_SNOWCAP: {
+                            glyph = lum > 0.65 ? '#' : '*';
+                            cr = Math.min(1, pt.r * (0.82 + 0.25 * ndotl));
+                            cg = Math.min(1, pt.g * (0.86 + 0.25 * ndotl));
+                            cb = 1.0;
+                            break;
+                        }
+                        case KIND_GARLAND: {
+                            const shimmer = 0.84 + 0.24 * Math.sin(simTime * 5.0 + pt.ph);
+                            glyph = shimmer > 0.96 ? '@' : (shimmer > 0.82 ? '#' : '*');
+                            cr = Math.min(1, pt.r * shimmer * (0.76 + 0.45 * ndotl));
+                            cg = Math.min(1, pt.g * shimmer * (0.76 + 0.45 * ndotl));
+                            cb = Math.min(1, pt.b * shimmer);
+                            break;
+                        }
+                        case KIND_BALL: {
+                            if (spec > 0.36) {
+                                glyph = '@';
+                                cr = Math.min(1, cr + 0.68);
+                                cg = Math.min(1, cg + 0.68);
+                                cb = Math.min(1, cb + 0.68);
+                                gType = 3; // Specular ball gleam
+                            } else {
+                                const bIdx = Math.min(RAMP_LEN - 2, Math.max(12, Math.floor(lum * (RAMP_LEN - 2))));
+                                glyph = ASCII_RAMP[bIdx];
+                            }
+                            break;
+                        }
+                        case KIND_LIGHT: {
+                            const pulse = 0.40 + 0.60 * Math.sin(simTime * 4.8 + pt.ph);
+                            glyph = pulse > 0.72 ? '@' : (pulse > 0.42 ? '$' : '*');
+                            const boost = 0.68 + 0.75 * pulse;
+                            cr = Math.min(1, pt.r * boost + (pulse > 0.80 ? 0.35 : 0));
+                            cg = Math.min(1, pt.g * boost + (pulse > 0.80 ? 0.35 : 0));
+                            cb = Math.min(1, pt.b * boost + (pulse > 0.80 ? 0.35 : 0));
+                            if (pulse > 0.52) gType = 1;
+                            break;
+                        }
+                        case KIND_STAR: {
+                            const gleam = 0.82 + 0.18 * Math.sin(simTime * 6.2 + pt.ph);
+                            glyph = gleam > 0.90 ? '@' : '$';
+                            cr = 1.0;
+                            cg = Math.min(1, 0.92 * gleam + 0.10);
+                            cb = Math.min(1, 0.48 * gleam + 0.16);
+                            gType = 2;
+                            break;
+                        }
+                        case KIND_GIFT: {
+                            const gIdx = Math.min(RAMP_LEN - 3, Math.max(10, Math.floor(lum * (RAMP_LEN - 4))));
+                            glyph = ASCII_RAMP[gIdx];
+                            break;
+                        }
+                        case KIND_RIBBON: {
+                            glyph = '@';
+                            cr = Math.min(1, pt.r * (0.80 + 0.32 * ndotl));
+                            cg = Math.min(1, pt.g * (0.80 + 0.32 * ndotl));
+                            cb = Math.min(1, pt.b * (0.80 + 0.32 * ndotl));
+                            break;
+                        }
+                    }
+
+                    const R255 = Math.min(255, Math.max(0, (cr * 255) | 0));
+                    const G255 = Math.min(255, Math.max(0, (cg * 255) | 0));
+                    const B255 = Math.min(255, Math.max(0, (cb * 255) | 0));
+
+                    charBuffer[cellIdx] = glyph;
+                    colorBuffer[cellIdx] = `rgb(${R255},${G255},${B255})`;
+                    glowTypeBuffer[cellIdx] = gType;
+                    if (gType > 0) {
+                        glowColorBuffer[cellIdx] = `rgba(${R255},${G255},${B255},`;
+                    }
+                }
+
+                // 4. Multi-Pass Radial Bloom Halos for Fairy Lights, Star Topper & Ball Speculars
+                ctx.save();
+                ctx.globalCompositeOperation = 'lighter';
+                for (let r = 0; r < rows; r++) {
+                    const rowOffset = r * cols;
+                    const py = r * cellH + cellH * 0.5;
+                    for (let c = 0; c < cols; c++) {
+                        const idx = rowOffset + c;
+                        const gType = glowTypeBuffer[idx];
+                        if (gType > 0) {
+                            const px = c * cellW + cellW * 0.5;
+                            const rad = gType === 2 ? cellH * 2.1 : (gType === 1 ? cellH * 1.45 : cellH * 0.95);
+                            const baseCol = glowColorBuffer[idx];
+                            const grad = ctx.createRadialGradient(px, py, 0, px, py, rad);
+                            if (gType === 2) {
+                                grad.addColorStop(0, 'rgba(254, 240, 138, 0.34)');
+                                grad.addColorStop(0.5, 'rgba(250, 204, 21, 0.12)');
+                                grad.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                            } else if (gType === 1) {
+                                grad.addColorStop(0, `${baseCol}0.32)`);
+                                grad.addColorStop(0.55, `${baseCol}0.10)`);
+                                grad.addColorStop(1, `${baseCol}0)`);
+                            } else {
+                                grad.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
+                                grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                            }
+                            ctx.fillStyle = grad;
+                            ctx.fillRect(px - rad, py - rad, rad * 2, rad * 2);
+                        }
+                    }
+                }
+                ctx.restore();
+
+                // 5. Render Crisp ASCII Glyphs onto Canvas
+                for (let r = 0; r < rows; r++) {
+                    const rowOffset = r * cols;
+                    const py = r * cellH;
+                    for (let c = 0; c < cols; c++) {
+                        const idx = rowOffset + c;
+                        const ch = charBuffer[idx];
+                        if (ch !== null) {
+                            activeLetters++;
+                            ctx.fillStyle = colorBuffer[idx];
+                            ctx.fillText(ch, c * cellW, py);
+                        }
+                    }
+                }
+
+                // 6. Radiant Crown Star Cross-Flare (after 8.7s)
+                if (simTime >= 8.70) {
+                    const starAge = Math.min(1, (simTime - 8.70) / 0.45);
+                    const starYWorld = 2.63;
+                    const ry = starYWorld * cosP;
+                    const rz = starYWorld * sinP;
+                    const persp = camDist / (camDist - rz);
+                    const starPx = centerX * cellW;
+                    const starPy = (centerY - ry * baseScale * persp) * cellH;
+                    const pulse = (0.78 + 0.22 * Math.sin(simTime * 5.8)) * starAge;
+
+                    ctx.save();
+                    ctx.globalCompositeOperation = 'lighter';
+                    const coreGlow = ctx.createRadialGradient(starPx, starPy, 0, starPx, starPy, cellH * 4.2);
+                    coreGlow.addColorStop(0, `rgba(254, 249, 195, ${(0.55 * pulse).toFixed(2)})`);
+                    coreGlow.addColorStop(0.45, `rgba(250, 204, 21, ${(0.20 * pulse).toFixed(2)})`);
+                    coreGlow.addColorStop(1, 'rgba(250, 204, 21, 0)');
+                    ctx.fillStyle = coreGlow;
+                    ctx.beginPath();
+                    ctx.arc(starPx, starPy, cellH * 4.2, 0, TAU);
+                    ctx.fill();
+
+                    ctx.strokeStyle = `rgba(254, 240, 138, ${(0.38 * pulse).toFixed(2)})`;
+                    ctx.lineWidth = 1.1;
+                    const rayLen = cellH * 3.1 * pulse;
+                    ctx.beginPath();
+                    ctx.moveTo(starPx - rayLen, starPy);
+                    ctx.lineTo(starPx + rayLen, starPy);
+                    ctx.moveTo(starPx, starPy - rayLen);
+                    ctx.lineTo(starPx, starPy + rayLen);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // 7. Update Real-Time HUD & Live Typing Python Editor
+                const deg = (((totalYaw * 180) / Math.PI) % 360 + 360) % 360;
+                hudTimer.textContent = simTime.toFixed(2).padStart(5, '0');
+                hudRot.textContent = deg.toFixed(2).padStart(6, '0');
+                hudLights.textContent = activeLights;
+                hudLetters.textContent = activeLetters.toLocaleString();
+                hudFps.textContent = Math.round(fpsSmooth);
+
+                const timelinePct = Math.min(100, (simTime / 20.0) * 100);
+                timelineBar.style.width = `${timelinePct}%`;
+
+                codeEditor.update(simTime);
+
+                requestAnimationFrame(renderFrame);
+            }
+
+            requestAnimationFrame(renderFrame);
+        };
+    </script>
+</body>
+</html>
